@@ -1,0 +1,21 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+typing-extensions = ">=4.4.0,<5.0.0"
+chatdocs = "==0.2.6"
+pytube = "==15.0.0"
+openai-whisper = "==20230918"
+typer = {extras = ["all"], version = "==0.9.0"}
+requests = "==2.29.0"
+feedparser = "==6.0.10"
+tqdm = ">=4.64.1,<5.0.0"
+# numba = "==0.58.0"
+# chatnerds = {file = ".", editable = true}  # Install package from setup.py in --editable mode (development)
+
+[dev-packages]
+
+[requires]
+python_version = "3.10"
