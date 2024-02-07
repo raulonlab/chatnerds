@@ -16,27 +16,52 @@ setup(
     url="https://github.com/raulonlab/{}".format(name),
     license="MIT",
     packages=[name],
+    package_data={name: ["config.yml"]},
     entry_points={
         "console_scripts": [
             f"{name} = {name}.cli:app",
         ],
     },
     install_requires=[
-        "chatdocs==0.2.6",
-        "pytube==15.0.0",
-        "openai-whisper==20230918",
-        "typer>=0.9.0",
-        "typing-extensions>=4.4.0,<5.0.0",
-        "requests==2.29.0",
-        "feedparser==6.0.10",
-        "tqdm>=4.64.1,<5.0.0",
-        # Temporary fix for version conflicts (using python 3.11?)
-        # "numba==0.58.0",
+        "python-dotenv",
+        "typing-extensions",
+        "typer",
+        "tqdm",
+        "rich",
+        "pytubefix",
+        "requests",
+        "feedparser",
+        "optimum",
+        "deepmerge",
+        "pyyaml",
+
+        # LLM dependencies
+        "langchain",
+        "langchain-community",
+        "chromadb",
+        "InstructorEmbedding",
+        "sentence-transformers",
+        "huggingface_hub",
+        "transformers",
+        "auto-gptq",
+        "accelerate",
+        "llama-cpp-python",
+        "openai",
+        "openai-whisper",
+
+        # Document Loaders
+        "pdfminer.six",
+        "extract-msg",
+        # "pandoc",
+        # "pypandoc",
+        "unstructured",
     ],
     extras_require={
-        # "gptq": [
-        #     "auto-gptq>=0.2.2,<0.3.0",
-        # ],
+        "gptq": [
+            "auto-gptq>=0.2.2,<0.3.0",
+            # "auto-gptq>=0.4.2,<0.5.0",
+            # "optimum>=1.12.0",
+        ],
         "tests": [
             "pytest",
         ],
@@ -56,5 +81,5 @@ setup(
         "Topic :: Software Development :: Libraries",
         "Topic :: Software Development :: Libraries :: Python Modules",
     ],
-    keywords="{} ctransformers transformers langchain chroma ai llm".format(name),
+    keywords="{}langchain chroma ai llm".format(name),
 )

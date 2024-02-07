@@ -1,14 +1,12 @@
-# Copy of original chatdocs/chat.py
-# Save Q & A history in a log file
-
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 from rich import print
 from rich.markup import escape
 from rich.panel import Panel
 from datetime import datetime
-from chatdocs.chains import get_retrieval_qa
+from .langchain_chains import get_retrieval_qa
 
 QA_LOG_PATH = "./chatnerds_qa.log"
+
 
 def write_qa_log(text: str) -> None:
     with open(QA_LOG_PATH, "a", encoding="utf-8") as file:
@@ -26,30 +24,20 @@ def get_log_header(config: Dict[str, Any]) -> str:
     log = "\n\n----------------------------------\n"
     log += f"Created at:      {now_string}\n"
     
-    if config['llm'] == "ctransformers":
-        log += "ctransformers:\n"
-        log += f"  model:             {config['ctransformers']['model']}\n"
-        log += f"  model_file:        {config['ctransformers']['model_file']}\n"
-        log += f"  model_type:        {config['ctransformers']['model_type']}\n"
-        log += "  config:\n"
-        log += f"    context_length:  {config['ctransformers']['config']['context_length']}\n"
-        log += f"    max_new_tokens:  {config['ctransformers']['config']['max_new_tokens']}\n"
-        log += f"    temperature:     {config['ctransformers']['config']['temperature']}\n"
-        log += f"    gpu_layers:      {config['ctransformers']['config']['gpu_layers']}\n"
-        log += f"    threads:         {config['ctransformers']['config']['threads']}\n"
-
     log += "----------------------------------\n"
     
     return log
 
 def chat(config: Dict[str, Any], query: Optional[str] = None) -> None:
     qa = get_retrieval_qa(config, callback=handle_answer)
+    # qa = get_retrieval_qa(config)
 
     interactive = not query
     print()
     if interactive:
         print("Type your query below and press Enter.")
         print("Type 'exit' or 'quit' or 'q' to exit the application.\n")
+
     while True:
         print("[bold]Q: ", end="", flush=True)
         if interactive:
@@ -67,8 +55,11 @@ def chat(config: Dict[str, Any], query: Optional[str] = None) -> None:
         write_qa_log(f"{get_log_header(config)}{log_query}")
 
         res = qa(query)
-        if config["llm"] != "ctransformers":
+
+        if "result" in res:
             handle_answer(res["result"])
+        else:
+            handle_answer("No response result found!")
 
         print()
         log_sources = "\nSources:\n"
@@ -86,3 +77,4 @@ def chat(config: Dict[str, Any], query: Optional[str] = None) -> None:
 
         if not interactive:
             break
+

@@ -12,6 +12,7 @@ from urllib.parse import urlparse
 import logging
 import feedparser
 import requests
+import music_tag
 from dateutil.parser import parse as dateparse
 from feedparser import CharacterEncodingOverride
 from tqdm import tqdm
@@ -300,6 +301,8 @@ class PodcastDownloader:
 
         with progress_bar, open(filename, "wb") as outfile:
             self.prettyCopyfileobj(response, outfile, callback=callback)
+        
+        PodcastDownloader.write_tags(filename, episode_dict)
 
     def downloadEpisode(self, link, *, feed_info, episode_dict, output_path="."):
         filename = self.checkEpisodeExistsPreflight(link, feed_info=feed_info, episode_dict=episode_dict, output_path=output_path)
@@ -333,3 +336,9 @@ class PodcastDownloader:
             fdst.write(chunk)
             if callback:
                 callback(len(chunk))
+
+    @staticmethod
+    def write_tags(filepath: str, episode_dict: dict, feed_dict: dict = None) -> None:
+        music_tag_file = music_tag.load_file(filepath)
+        music_tag_file["comment"] = episode_dict.get("url")
+        music_tag_file.save()

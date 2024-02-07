@@ -2,13 +2,16 @@
 # Audio transcriber: https://github.com/KostasEreksonas/Audio-transcriber/blob/main/transcriber.py
 # Translate transcribed text. Credit to Harsh Jain at educative.io: https://www.educative.io/answers/how-do-you-translate-text-using-python
 
-from typing import List, Union, Optional
+from typing import List, Union, Optional, Dict
 import os
 import glob
 import logging
 import torch
 import whisper
+import music_tag
+import json
 from .config import Config
+from .llms.summarizer import Summarizer
 
 class AudioTranscriber:
     source_directory: str
@@ -22,43 +25,56 @@ class AudioTranscriber:
 
         self.source_directory = source_directory
     
-    def run(self, filter_directory:str = "", output_path = "."):
+    def run(self, filter_directory:str = "", output_path: str = None) -> List[str]:
         audio_files = self.find_audio_files(self.source_directory)
         
         logging.info(f"Running transcriber with {len(audio_files)} audio files")
 
+        transcript_file_paths = []
         for audio_file in audio_files:
             if filter_directory and filter_directory not in audio_file:
                 continue
 
+            # Get filename without ext
+            input_audio_file_without_ext, ext = os.path.splitext(os.path.basename(audio_file))
+
+            # Get transcript file path
+            if output_path:
+                transcript_file_path = os.path.join(output_path, f"{input_audio_file_without_ext}.transcript")
+            else:
+                transcript_file_path = os.path.join(os.path.dirname(audio_file), f"{input_audio_file_without_ext}.transcript")
+
+            if os.path.exists(transcript_file_path):
+                transcript_file_paths.append(transcript_file_path)
+                continue
+                
             logging.debug(f"  ...transcribing: {audio_file}")
-            transcript_file_path = self.transcribe_audio(
+            transcript = self.transcribe_audio(
                 input_audio_file_path = str(audio_file),
                 model_name = self.config.WHISPER_TRANSCRIPTION_MODEL_NAME,
-                # output_path = str(Path(self.config.get_nerd_base_path(), "downloads")),
             )
-            logging.debug(f"  ...done! Output: '{transcript_file_path}'")
 
-        logging.info("\nyoutube downloader finished....")
+            audio_file_tags = self.read_audio_file_tags(str(audio_file))
+
+            summarizer = Summarizer(config=self.config.get_nerd_config())
+            summary = summarizer.summarize_text(transcript)
+
+            with open(transcript_file_path, "w", encoding="utf-8") as file:
+                file.write(f"transcript=\"{self.escape_dotenv_value(transcript)}\"\n")
+                file.write(f"summary=\"{self.escape_dotenv_value(summary)}\"\n")
+                for tag_key, tag_value in audio_file_tags.items():
+                    file.write(f"{tag_key}=\"{self.escape_dotenv_value(tag_value)}\"\n")
+
+            transcript_file_paths.append(transcript_file_path)
+
+        logging.info("\nTranscript finished....")
+        return transcript_file_paths
 
 
-    def transcribe_audio(self, input_audio_file_path: str, model_name: str = "tiny", output_path: Union[str, None] = None):
+    def transcribe_audio(self, input_audio_file_path: str, model_name: str = "tiny"):
         """Transcribe audio file."""
 
-        # Get filename without ext
-        input_audio_file_without_ext, ext = os.path.splitext(os.path.basename(input_audio_file_path))
-
-        # Fix output_path: If None, use input_audio_file_path's directory
-        if not output_path:
-            output_path = os.path.dirname(input_audio_file_path)
-
-        # If transcription file (.txt) exists, return it
-        transcript_output_file_path = os.path.join(output_path, f"{input_audio_file_without_ext}.txt")
-        if os.path.exists(transcript_output_file_path):
-            return transcript_output_file_path
-        
         """Get speech recognition model."""
-        # model_name = input("Select speech recognition model name (tiny, base, small, medium, large): ")
         logging.debug("Transcribing audio...")
         model = whisper.load_model(model_name, device=self.check_device())
         result = model.transcribe(input_audio_file_path)
@@ -66,11 +82,8 @@ class AudioTranscriber:
         """Put a newline character after each sentence in the transcript."""
         formatted_text = result["text"].replace(". ", ".\n")
 
-        with open(transcript_output_file_path, "w", encoding="utf-8") as file:
-            file.write(formatted_text)
-            logging.debug(f"Transcript completed successfully in '{transcript_output_file_path}'")
-        
-        return transcript_output_file_path
+        return formatted_text
+
 
     @staticmethod
     def find_audio_files(directory_path: str):
@@ -79,6 +92,24 @@ class AudioTranscriber:
             audio_files.append(os.path.abspath(filename))
         
         return audio_files
+
+
+    @staticmethod
+    def read_audio_file_tags(filepath: str) -> Dict[str, str]:
+        music_tag_file = music_tag.load_file(filepath)
+        return {
+            "title": str(music_tag_file["title"]),
+            "album": str(music_tag_file["album"]),
+            "artist": str(music_tag_file["artist"]),
+            "comment": str(music_tag_file["comment"]),
+        }
+    
+
+    @staticmethod
+    def escape_dotenv_value(text: str) -> Dict[str, str]:
+        """Strip characters and replace double quotes with single quotes."""
+        return text.strip(" \n\"").replace("\"", "'")
+
 
     @staticmethod
     def check_device():

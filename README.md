@@ -80,11 +80,9 @@ chatnerds chat
 ```
 > The first time, it needs to download the AI models and takes a while
 
-#### Model settings in chatdocs.yml
+#### Model settings in config.yml
 
-The file `./nerds/stoicism/chatdocs.yml` contains the settings for the AI models. You can change the settings and restart the chat to see the changes. See [ChatDocs](https://github.com/marella/chatdocs) for more information about the settings.
-
-Also see [docs/chatdocs_tests.md](docs/chatdocs_tests.md) with some tests I've made using different models.
+The file `./nerds/stoicism/config.yml` contains the settings for the AI models. You can change the settings and restart the chat to see the changes. See [ChatDocs](https://github.com/marella/chatdocs) for more information about the settings.
 
 
 ## Configuration with environment variables

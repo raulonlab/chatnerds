@@ -32,6 +32,11 @@ DirectoryFilterArgument = Annotated[
     typer.Argument(help="The relative path of the directory to be processed. Optional."),
 ]
 
+UrlFilterArgument = Annotated[
+    str,
+    typer.Argument(help="Url of Youtube video"),
+]
+
 def prompt_active_nerd(active_nerd: str, nerd_base_path: Path):
     if not nerd_base_path.exists():
         typer.echo(f"The active nerd {utils.LogColors.BOLDNERD}{active_nerd}{utils.LogColors.ENDC} does not exist. Please create it first.")

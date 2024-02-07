@@ -4,18 +4,72 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
+# LLM ####
+langchain = "==0.1.5"
+langchain-community = "==0.0.17"
+# llama-cpp-python = ">=0.2.38"
+chromadb = "==0.4.20"
+# InstructorEmbedding = ">=1.0.1,<2.0.0"
+sentence-transformers = "==2.2.2"
+huggingface_hub = ">=0.20.3"
+transformers = ">=4.37.2"
+auto-gptq = "==0.2.2"
+accelerate = "*"
+openai = ">=1.11.1"
+openai-whisper = "==20231117"
+
+# LLM document Loaders ####
+# pdfminer = {six = "==20221105"}
+# extract-msg = ">=0.41.0,<0.42.0"
+# unstructured = ">=0.6.0,<0.7.0"
+
+# Tools and general dependencies ####
 typing-extensions = ">=4.4.0,<5.0.0"
-chatdocs = "==0.2.6"
-pytube = "==15.0.0"
-openai-whisper = "==20230918"
-typer = {extras = ["all"], version = "==0.9.0"}
-requests = "==2.29.0"
-feedparser = "==6.0.10"
+python-dotenv = ">=0.19.2"
+typer = {extras = ["all"], version = ">=0.9.0,<1.0.0"}
 tqdm = ">=4.64.1,<5.0.0"
+rich = ">=13.0.1"
+requests = "==2.31.0"
+optimum = ">=1.12.0"
+deepmerge = ">=1.1.0,<2.0.0"
+pyyaml = ">=6.0"
+# pytube = "==15.0.0"
+pytubefix = "==1.12.0"
+feedparser = "==6.0.10"
+music-tag = "*"
+
+# Other dependencies
+# ctransformers = "*"
+# pydantic = "==1.10.12"
 # numba = "==0.58.0"
-# chatnerds = {file = ".", editable = true}  # Install package from setup.py in --editable mode (development)
+# argilla = "==1.8.0"
+# numpy = "==1.23.5"
+# pandas = "*"
+
+# Install package in editable mode
+chatnerds = {file = ".", editable = true}
 
 [dev-packages]
+deptry = "*"
+pylint = "*"
+autoflake = "*"
+black = "*"
+isort = "*"
+pipdeptree = "*"
+findpydeps = "*"
+
+[scripts]
+autoflake = "autoflake --remove-unused-variables --remove-all-unused-imports --recursive --verbose ./"
+autoflake-fix = "autoflake --in-place --remove-unused-variables --remove-all-unused-imports --recursive --verbose ./"
+black = "black ./"
+isort = "isort ./"
+lint = "pylint ./chatnerds"
+pipdeptree = "pipdeptree --local-only"
+pipdeptree-freeze-save = "pipdeptree --local-only --warn silence --freeze | grep -E '^[a-zA-Z0-9\\-]+' > requirements.txt"
+pipdeptree-freeze = "pipdeptree --local-only --warn silence --freeze | grep -E '^[a-zA-Z0-9\\-]+'"
+pipdeptree-circular = "pipdeptree --local-only --warn fail --exclude pip,pipdeptree,setuptools,wheel"
+findpydeps = "findpydeps -l -i chatnerds"
+findpydeps-freeze = "findpydeps -i ./chatnerds/ > requirements.txt"
 
 [requires]
-python_version = "3.10"
+python_version = "3.11"

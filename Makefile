@@ -13,6 +13,10 @@ dev:
 build:
 	python setup.py bdist_wheel
 
+install-metal:
+#	CMAKE_ARGS="-DLLAMA_METAL=on" FORCE_CMAKE=1 pip install --upgrade --force-reinstall llama-cpp-python==0.1.83 --no-cache-dir
+	CMAKE_ARGS="-DLLAMA_METAL=on" FORCE_CMAKE=1 pip install --upgrade --force-reinstall llama-cpp-python --no-cache-dir
+
 # show help: Renders automatically categories (##) and targets (###). Regular comments (#) ignored
 # Based on: https://gist.github.com/prwhite/8168133?permalink_comment_id=2278355#gistcomment-2278355
 TARGET_COLOR := $(shell tput -Txterm setaf 6)

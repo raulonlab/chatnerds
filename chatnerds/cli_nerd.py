@@ -6,10 +6,6 @@ from typing import Dict
 import typer
 from .config import Config
 
-YOUTUBE_SOURCES_FILE_NAME = "youtube.sources"
-PODCAST_SOURCES_FILE_NAME = "podcast.sources"
-CHATDOCS_YAML_FILE_NAME = "chatdocs.yml"
-
 YOUTUBE_SOURCES_INITIAL_CONTENT = """
 # playlist urls
 # https://www.youtube.com/playlist?list=...
@@ -23,10 +19,9 @@ PODCAST_SOURCES_INITIAL_CONTENT = """
 # https://feeds.simplecast.com/...
 """
 
-CHATDOCS_YAML_INITIAL_CONTENT = """
-# Override chatdocs configuration. Default: https://github.com/marella/chatdocs/blob/main/chatdocs/data/chatdocs.yml
+NERD_CONFIG_INITIAL_CONTENT = """
+# Override default nerd config
 
-download: true
 """
 
 global_config = Config.environment_instance()
@@ -50,12 +45,12 @@ def create_nerd(nerd_name: str):
     Path(nerd_path, "source_documents").mkdir(parents=True, exist_ok=True)
 
     # nerd sources files
-    with open(Path(nerd_path, YOUTUBE_SOURCES_FILE_NAME), "w", encoding="utf-8") as file:
+    with open(Path(nerd_path, Config._YOUTUBE_SOURCES_FILENAME), "w", encoding="utf-8") as file:
         file.write(YOUTUBE_SOURCES_INITIAL_CONTENT)
-    with open(Path(nerd_path, PODCAST_SOURCES_FILE_NAME), "w", encoding="utf-8") as file:
+    with open(Path(nerd_path, Config._PODCAST_SOURCES_FILENAME), "w", encoding="utf-8") as file:
         file.write(PODCAST_SOURCES_INITIAL_CONTENT)
-    with open(Path(nerd_path, CHATDOCS_YAML_FILE_NAME), "w", encoding="utf-8") as file:
-        file.write(CHATDOCS_YAML_INITIAL_CONTENT)
+    with open(Path(nerd_path, Config._NERD_CONFIG_FILENAME), "w", encoding="utf-8") as file:
+        file.write(NERD_CONFIG_INITIAL_CONTENT)
 
     logging.info(f"Nerd '{nerd_name}' created")
 

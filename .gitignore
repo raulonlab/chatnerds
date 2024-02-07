@@ -1,7 +1,7 @@
 # Custom
 nerds/
 logs/
-notes.md
+notes*.md
 .vscode/
 .DS_Store
 
