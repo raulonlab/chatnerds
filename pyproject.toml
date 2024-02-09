@@ -21,6 +21,7 @@ auto-gptq = "==0.2.2"
 accelerate = "*"
 openai = ">=1.11.1"
 # openai-whisper = "==20231117"
+openai-whisper = {git = "https://github.com/openai/whisper.git", tag = "v20231117"}
 typing-extensions = ">=4.4.0,<5.0.0"
 python-dotenv = ">=0.19.2"
 typer = {extras = ["all"], version = ">=0.9.0,<1.0.0"}
