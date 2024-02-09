@@ -138,8 +138,6 @@ class LLMFactory:
         """
 
         logging.info("Using Llamacpp for GGUF/GGML quantized models")
-        # print("kwargs: ")
-        # print(kwargs)
 
         try:
             model_path = hf_hub_download(
@@ -148,28 +146,18 @@ class LLMFactory:
                 resume_download=True,
                 # cache_dir=MODELS_PATH,
             )
-            # kwargs = { **kwargs['kwargs'] }
-            # model_kwargs["model_path"] = model_path
-            # kwargs = {
-            #     "model_path": model_path,
-            #     "n_ctx": CONTEXT_WINDOW_SIZE,
-            #     "max_tokens": MAX_NEW_TOKENS,
-            #     "n_batch": N_BATCH,  # set this based on your GPU & CPU RAM
-            # }
+
             if device_type.lower() == "mps":
                 kwargs["n_gpu_layers"] = 1
-                logging.info("Using MPS for GGUF/GGML quantized models")
-            # if device_type.lower() == "cuda":
-            #     model_kwargs["n_gpu_layers"] = N_GPU_LAYERS  # set this based on your GPU
+                logging.info(f"Using MPS for GGUF/GGML quantized models. n_gpu_layers={kwargs['n_gpu_layers']}")
 
             llm = LlamaCpp(model_path=model_path, **kwargs)
-            # print("LlamaCpp:llm: ")
-            # print(llm)
 
             return llm
-        except:
+        except Exception as err:
+            logging.error(f"Error loading GGUF/GGML model: {err}")
             if "ggml" in model_basename:
-                logging.INFO("If you were using GGML model, LLAMA-CPP Dropped Support, Use GGUF Instead")
+                logging.info("If you were using GGML model, LLAMA-CPP Dropped Support, Use GGUF Instead")
             return None
 
 
