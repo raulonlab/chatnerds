@@ -1,0 +1,50 @@
+[tool.poetry]
+name = "chatnerds"
+version = "0.1.0"
+description = "CLI application to chat with YouTube videos, podcasts and your documents offline using LLMs"
+authors = ["Raul On Lab <raulonlab@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+langchain = "==0.1.5"
+langchain-community = "==0.0.17"
+chromadb = "==0.4.20"
+InstructorEmbedding = ">=1.0.1,<2.0.0"
+sentence-transformers = "==2.2.2"
+huggingface_hub = ">=0.20.3"
+transformers = ">=4.37.2"
+auto-gptq = "==0.2.2"
+accelerate = "*"
+openai = ">=1.11.1"
+# openai-whisper = "==20231117"
+typing-extensions = ">=4.4.0,<5.0.0"
+python-dotenv = ">=0.19.2"
+typer = {extras = ["all"], version = ">=0.9.0,<1.0.0"}
+tqdm = ">=4.64.1,<5.0.0"
+rich = ">=13.0.1"
+requests = "==2.31.0"
+optimum = ">=1.12.0"
+deepmerge = ">=1.1.0,<2.0.0"
+pyyaml = ">=6.0"
+pytubefix = "==1.12.0"
+feedparser = "==6.0.10"
+music-tag = "*"
+# chatnerds = {file = ".", develop = true}
+
+
+[tool.poetry.group.dev.dependencies]
+deptry = "*"
+pylint = "*"
+autoflake = "*"
+black = "*"
+pipdeptree = "*"
+findpydeps = "*"
+pre-commit = "^3.6.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+chatnerds = "chatnerds.cli:app"
