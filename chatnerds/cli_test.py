@@ -35,10 +35,7 @@ def split(input_file_path: str):
         transcript_documents = TranscriptLoader(input_file_path).load()
 
         summarizer = Summarizer(nerd_config)
-        summary = summarizer.summarize_text(
-            transcript_documents[0].page_content,
-            source_title=transcript_documents[0].metadata.get("title", None),
-            )
+        summary = summarizer.summarize_text(transcript_documents[0].page_content)
 
         print(f"Summarize {input_file_path}:")
         print("#########################")

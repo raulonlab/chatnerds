@@ -27,7 +27,8 @@ class Config(object):
     LOG_FILE_PATH: str = "logs/chatnerds.log"  # (Default: "logs/chatnerds.log") Path to log file
     VERBOSE: int = 1                      # (Default: 1) Amount of logs written to stdout (0: none, 1: medium, 2: full)
     OPENAI_API_KEY: str = ""              # (Default: "") OpenAI API key
-    WHISPER_TRANSCRIPTION_MODEL_NAME: str = "tiny"  # (Default: "tiny") Name of the model to use for transcribing audios: tiny, base, small, medium, large
+    WHISPER_TRANSCRIPTION_MODEL_NAME: str = "base"  # (Default: "base") Name of the model to use for transcribing audios: tiny, base, small, medium, large
+    TRANSCRIPT_ADD_SUMMARY: bool = False  # (Default: False) Include a summary of the transcription in the output file
     YOUTUBE_GROUP_BY_AUTHOR: bool = True  # (Default: True) Group downloaded videos by channel
     YOUTUBE_SLEEP_SECONDS_BETWEEN_DOWNLOADS: int = 3 # (Default: 3) Number of seconds to sleep between downloads
     YOUTUBE_ADD_DATE_PREFIX: bool = True  # (Default: True) Prefix all episodes with an ISO8602 formatted date of when they were published. Useful to ensure chronological ordering
@@ -82,6 +83,7 @@ class Config(object):
             
             # fix types
             cls._environment_instance.VERBOSE = int(cls._environment_instance.VERBOSE)
+            cls._environment_instance.TRANSCRIPT_ADD_SUMMARY = bool(cls._environment_instance.TRANSCRIPT_ADD_SUMMARY)
             cls._environment_instance.YOUTUBE_GROUP_BY_AUTHOR = bool(cls._environment_instance.YOUTUBE_GROUP_BY_AUTHOR)
             cls._environment_instance.YOUTUBE_SLEEP_SECONDS_BETWEEN_DOWNLOADS = int(cls._environment_instance.YOUTUBE_SLEEP_SECONDS_BETWEEN_DOWNLOADS)
             cls._environment_instance.YOUTUBE_ADD_DATE_PREFIX = bool(cls._environment_instance.YOUTUBE_ADD_DATE_PREFIX)

@@ -5,48 +5,45 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.prompts import PromptTemplate
 from langchain.llms.base import LLM as LLMBase
 from langchain.chains.summarize import load_summarize_chain
+from langchain.chains.combine_documents.base import BaseCombineDocumentsChain
+
 from .llm_factory import LLMFactory
 
 
 class Summarizer:
     config: Dict[str, Any] = {}
     llm: LLMBase = None
+    chain: BaseCombineDocumentsChain = None
 
     def __init__(self, config: Dict[str, Any]):
         self.config = config
         self.llm = LLMFactory(config).get_llm()
+        if (self.config.get("summarize_chain_type") == "map_reduce"):
+            self.chain = self._get_mapreduce_summarize_chain(self.llm)
+        elif (self.config.get("summarize_chain_type") == "refine"):
+            self.chain = self._get_refine_summarize_chain(self.llm)
+        else:
+            self.chain = self._get_stuff_summarize_chain(self.llm)
     
 
-    def summarize_documents(self, docs: List[Document], split: bool = False, source_title: str = None) -> str:
+    def summarize_documents(self, docs: List[Document], split: bool = False) -> str:
         if (split):
             text_splitter = RecursiveCharacterTextSplitter()    # separators=["\n\n", "\n", ".", " "], chunk_size=1800, chunk_overlap=200
             docs = text_splitter.split_documents(docs)
-
-        if (self.config.get("summarize_chain_type") == "map_reduce"):
-            summary = self._summarize_docs_with_mapreduce(self.llm, docs, source_title=source_title)
-        elif (self.config.get("summarize_chain_type") == "refine"):
-            summary = self._summarize_docs_with_refine(self.llm, docs, source_title=source_title)
-        else:
-            summary = self._summarize_docs_with_stuff(self.llm, docs, source_title=source_title)
         
-        # print("summarize_chain_type: ", self.config.get("summarize_chain_type"))
+        summary = self.chain.run(docs)
         # print("summary:\n", summary)
         
         return summary
 
 
-    def summarize_text(self, text: str, source_title: str = None) -> str:
-        return self.summarize_documents(docs=[Document(page_content=text)], split=True, source_title=source_title)
+    def summarize_text(self, text: str) -> str:
+        return self.summarize_documents(docs=[Document(page_content=text)], split=True)
 
 
-    # Sure, here's the list of main topics and themes:
-    #     first date tips, self-confidence, body language, respect, attraction, comfort, spark, relationship maintenance.
     @staticmethod
-    def _summarize_docs_with_mapreduce(llm: LLMBase, docs: List[Document], source_title: str = None) -> str:
+    def _get_mapreduce_summarize_chain(llm: LLMBase) -> str:
         intro = "The following is a set of documents"
-
-        if (source_title):
-            intro = f"{intro} with the title '{source_title}'"
 
         map_template = intro + """
 
@@ -75,13 +72,11 @@ class Summarizer:
             verbose=False
             ) # verbose=True optional to see what is getting sent to the LLM
         
-        output = chain.run(docs)
-
-        return output
+        return chain
 
 
     @staticmethod
-    def _summarize_docs_with_refine(llm: LLMBase, docs: List[Document], source_title: str = None) -> str:
+    def _get_refine_summarize_chain(llm: LLMBase) -> str:
         initial_template = """
         Extract the most relevant themes from the following:
 
@@ -114,13 +109,11 @@ class Summarizer:
             verbose=False
             ) # verbose=True optional to see what is getting sent to the LLM
         
-        output = chain.run(docs)
-
-        return output
+        return chain
 
 
     @staticmethod
-    def _summarize_docs_with_stuff(llm: LLMBase, docs: List[Document], source_title: str = None) -> str:
+    def _get_stuff_summarize_chain(llm: LLMBase) -> str:
         template = """
         Write a concise summary of the following in GERMAN:
 
@@ -139,7 +132,5 @@ class Summarizer:
             verbose=False
             ) # verbose=True optional to see what is getting sent to the LLM
         
-        output = chain.run(docs)
-
-        return output
+        return chain
 

@@ -16,6 +16,8 @@ from .llms.summarizer import Summarizer
 class AudioTranscriber:
     source_directory: str
     config: Config = Optional[Config]
+    model: any = None
+    summarizer: Summarizer = None
 
     def __init__(self, source_directory: str = ".", config: Config = None):
         if config:
@@ -56,12 +58,15 @@ class AudioTranscriber:
 
             audio_file_tags = self.read_audio_file_tags(str(audio_file))
 
-            summarizer = Summarizer(config=self.config.get_nerd_config())
-            summary = summarizer.summarize_text(transcript)
+            if (self.config.TRANSCRIPT_ADD_SUMMARY):
+                if (self.summarizer is None):
+                    self.summarizer = Summarizer(config=self.config.get_nerd_config())
+                summary = self.summarizer.summarize_text(transcript)
 
             with open(transcript_file_path, "w", encoding="utf-8") as file:
                 file.write(f"transcript=\"{self.escape_dotenv_value(transcript)}\"\n")
-                file.write(f"summary=\"{self.escape_dotenv_value(summary)}\"\n")
+                if (summary is not None):
+                    file.write(f"summary=\"{self.escape_dotenv_value(summary)}\"\n")
                 for tag_key, tag_value in audio_file_tags.items():
                     file.write(f"{tag_key}=\"{self.escape_dotenv_value(tag_value)}\"\n")
 
@@ -75,9 +80,12 @@ class AudioTranscriber:
         """Transcribe audio file."""
 
         """Get speech recognition model."""
-        logging.debug("Transcribing audio...")
-        model = whisper.load_model(model_name, device=self.check_device())
-        result = model.transcribe(input_audio_file_path)
+        logging.info(f"Transcribing audio '{input_audio_file_path}' ...")
+        if self.model is None:
+            logging.info(f"Loading model '{model_name}' with device '{self.check_device()}' ...")
+            self.model = whisper.load_model(model_name, device=self.check_device())
+            logging.info("Model loaded successfully")
+        result = self.model.transcribe(input_audio_file_path)
 
         """Put a newline character after each sentence in the transcript."""
         formatted_text = result["text"].replace(". ", ".\n")
