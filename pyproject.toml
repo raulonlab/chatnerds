@@ -1,12 +1,15 @@
 [tool.poetry]
 name = "chatnerds"
+packages = [
+    {include = "chatnerds"},
+]
 version = "0.1.0"
-description = "CLI application to chat with YouTube videos, podcasts and your documents offline using LLMs"
+description = "CLI application to Q&A with YouTube videos, podcasts and documents offline using local LLMs and RAG (Retrieval-augmented generation) techniques"
 authors = ["Raul On Lab <raulonlab@gmail.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = "^3.10"
 langchain = "==0.1.5"
 langchain-community = "==0.0.17"
 chromadb = "==0.4.20"
