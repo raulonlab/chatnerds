@@ -13,6 +13,7 @@ readme = "README.md"
 python = "^3.10"
 langchain = "==0.1.5"
 langchain-community = "==0.0.17"
+llama-cpp-python = ">=0.2.38"
 chromadb = "==0.4.20"
 InstructorEmbedding = ">=1.0.1,<2.0.0"
 sentence-transformers = "==2.2.2"
@@ -35,8 +36,6 @@ pyyaml = ">=6.0"
 pytubefix = "==1.12.0"
 feedparser = "==6.0.10"
 music-tag = "*"
-# chatnerds = {file = ".", develop = true}
-
 
 [tool.poetry.group.dev.dependencies]
 deptry = "*"

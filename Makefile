@@ -1,29 +1,42 @@
 .DEFAULT_GOAL := help
-.PHONY: clean build help
+.PHONY: clean help
 
-### activate environment, install requirements and local package (.)
-install:
-#	pipenv --rm
-#	pipenv install --dev
-	poetry install
-	poetry run pip install openai-whisper
-
-dev:
-	pipenv install -e .
-
-### build package
-build:
-	python setup.py bdist_wheel
-
+## Dependencies
+### Install dependencies for MacOS (Metal device)
 install-metal:
-#	CMAKE_ARGS="-DLLAMA_METAL=on" FORCE_CMAKE=1 pip install --upgrade --force-reinstall llama-cpp-python==0.1.83 --no-cache-dir
-	CMAKE_ARGS="-DLLAMA_METAL=on" FORCE_CMAKE=1 pip install --upgrade --force-reinstall llama-cpp-python --no-cache-dir
+	CMAKE_ARGS="-DLLAMA_METAL=on" FORCE_CMAKE=1 pip install --upgrade --force-reinstall llama-cpp-python>=2.38.0 --no-cache-dir
 #	CMAKE_ARGS="-DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_APPLE_SILICON_PROCESSOR=arm64 -DLLAMA_METAL=on" pip install --upgrade --verbose --force-reinstall --no-cache-dir llama-cpp-python
 
-requirements:
-	poetry export -f requirements.txt --output requirements.txt --without-hashes --without-urls --only main
-	poetry export -f requirements.txt --output requirements-dev.txt --without-hashes --without-urls --only dev
+## Poetry commands
+### Export requirements.txt and requirements-dev.txt
+poetry-export-requirements:
+	@poetry export -f requirements.txt --output requirements.txt --without-hashes --without-urls --only main
+	@poetry export -f requirements.txt --output requirements-dev.txt --without-hashes --without-urls --only dev
 
+### Create git tag and git push
+poetry-version-tag:
+	@git tag v$$(poetry version -s)
+	@git push --tags
+
+### autoflake detect (remove unused imports and variables)
+poetry-autoflake:
+	@poetry run autoflake --remove-unused-variables --remove-all-unused-imports --recursive --verbose ./chatnerds
+
+### autoflake fix (remove unused imports and variables)
+poetry-autoflake-fix:
+	@poetry run autoflake --in-place --remove-unused-variables --remove-all-unused-imports --recursive --verbose ./chatnerds
+
+### black
+poetry-black:
+	@poetry run black ./chatnerds
+
+### lint
+poetry-lint:
+	@poetry run pylint ./chatnerds
+
+### Detect and show dependencies
+poetry-deptry:
+	@poetry run deptry .
 
 # show help: Renders automatically categories (##) and targets (###). Regular comments (#) ignored
 # Based on: https://gist.github.com/prwhite/8168133?permalink_comment_id=2278355#gistcomment-2278355
