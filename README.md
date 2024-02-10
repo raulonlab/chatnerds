@@ -1,24 +1,24 @@
 # [ChatNerds](https://github.com/raulonlab/chatnerds)
 
-CLI application to chat with YouTube videos, podcasts and your documents offline using AI. No data leaves your system. Internet connection is only required to download the audios, install the tool and download the AI models. It uses [ChatDocs](https://github.com/marella/chatdocs) for all the AI stuff.
+CLI application to Q&A with YouTube videos, podcasts and documents offline using local LLMs and RAG (Retrieval-augmented generation) techniques. Your documents and conversations don't leaves your system.
 
 ## Installation
 
-Install package (requires python 3.10)
+Install package (requires python >=3.10)
 ```shell
-pip install git+https://github.com/raulonlab/chatnerds#egg=chatnerds
+pip install git+https://github.com/raulonlab/chatnerds.git
 ```
 
 Or creating an environment
 ```shell
 pyenv shell 3.10
 pipenv shell
-pipenv install git+https://github.com/raulonlab/chatnerds#egg=chatnerds
+pipenv install git+https://github.com/raulonlab/chatnerds.git
 ```
 
 ## Usage
 
-ChatNerds works with different "nerds" (collections of source documents) allowing to chat separatelly in certain areas of knowledge. You can create a new nerd, add sources of an specific subject to it and chat with it.
+ChatNerds works with a collection of sources called "nerd" allowing to chat separately in certain areas of knowledge. You can create a new nerd, add sources of an specific subject to it and chat with it.
 
 For this example, we're going to create a new nerd called "stoicism" and work with it:
 
@@ -42,9 +42,22 @@ There are other commands to manage the nerds. See `chatnerds nerd --help` for mo
 
 Each nerd is able to process 3 types of sources: documents (pdf, docx, etc), youtube (playlist and video urls) and podcasts (xml feed urls). Add the sources for each type:
 
-- documents: Copy your document files (pdf, txt, etc) into the directory `./nerds/stoicism/source_documents`. See [marella/chatdocs: Chat with your documents offline using AI](https://github.com/marella/chatdocs) for more information about the supported formats.
-- youtube: Open `./nerds/stoicism/youtube.sources` and add the urls of the videos and playlists you want to add. One url per line. Lines starting with `# ` are ignored.
-- podcasts: Open `./nerds/stoicism/podcast.sources` and add the urls of the podcasts you want to add. One url per line. Lines starting with `# ` are ignored.
+- **documents**: Copy your document files into the directory `./nerds/stoicism/source_documents`. The current supported formats with the loader class (from Langchain) used are the following:
+	- `".pdf"`: PDFMinerLoader,
+	- `".epub"`: UnstructuredEPubLoader,
+	- `".md"`: UnstructuredMarkdownLoader,
+	- `".txt"`: TextLoader,
+	- `".doc"`: UnstructuredWordDocumentLoader,
+	- `".docx"`: UnstructuredWordDocumentLoader,
+	- `".enex"`: EverNoteLoader,
+	- `".csv"`: CSVLoader,
+	- `".html"`: UnstructuredHTMLLoader,
+	- `".odt"`: UnstructuredODTLoader,
+	- `".ppt"`: UnstructuredPowerPointLoader,
+	- `".pptx"`: UnstructuredPowerPointLoader,
+
+- **youtube**: Open `./nerds/stoicism/youtube.sources` and add the urls of the videos and playlists you want to add. One url per line. Lines starting with `# ` are ignored.
+- **podcasts**: Open `./nerds/stoicism/podcast.sources` and add the urls of the podcasts you want to add. One url per line. Lines starting with `#` are ignored.
 
 There are some free resources about "stoicism" in [docs/stoicism_resources.md](docs/stoicism_resources.md).
 
@@ -71,7 +84,6 @@ chatnerds add
 ```
 > The first time, it creates a new directory for the DB in `./nerds/stoicism/db/` and downloads the AI models (It takes a while)
 
-
 #### Chat with the nerd
 
 Start chatting with your nerd about stoicism:
@@ -80,10 +92,11 @@ chatnerds chat
 ```
 > The first time, it needs to download the AI models and takes a while
 
-#### Model settings in config.yml
+#### Nerd model settings in config.yml
 
-The file `./nerds/stoicism/config.yml` contains the settings for the AI models. You can change the settings and restart the chat to see the changes. See [ChatDocs](https://github.com/marella/chatdocs) for more information about the settings.
+The file `./nerds/stoicism/config.yml` allows to override the default model settings used by the nerd. See the default configuration (with annotations) in [chatnerds/config.yml](chatnerds/config.yml). The new configuration is applied on every command. 
 
+> Note that changing some of the configuration, like `embeddings` and `chroma`, will invalidate the current embeddings added in the database. To fix it, delete the directory `./nerds/stoicism/db` and start again
 
 ## Configuration with environment variables
 
@@ -97,7 +110,8 @@ LOG_FILE_PATH=logs/chatnerds.log  # (Default: "logs/chatnerds.log") Path to log 
 VERBOSE=1  # (Default: 1) Amount of logs written to stdout (0: none, 1: medium, 2: full)
 
 # transcription (Whisper) options
-WHISPER_TRANSCRIPTION_MODEL_NAME=tiny  # (Default: "tiny") Name of the model to use for transcribing audios: tiny, base, small, medium, large
+WHISPER_TRANSCRIPTION_MODEL_NAME=base  # (Default: "base") Name of the model to use for transcribing audios: tiny, base, small, medium, large
+TRANSCRIPT_ADD_SUMMARY=False # (Default: False) Include a summary of the transcription in the output file
 
 # youtube donwload options
 YOUTUBE_GROUP_BY_AUTHOR=True  # (Default: True) Group downloaded videos by channel
