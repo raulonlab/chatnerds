@@ -42,8 +42,6 @@ deptry = "*"
 pylint = "*"
 autoflake = "*"
 black = "*"
-pipdeptree = "*"
-findpydeps = "*"
 pre-commit = "^3.6.0"
 
 [build-system]

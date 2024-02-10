@@ -847,17 +847,6 @@ testing = ["covdefaults (>=2.3)", "coverage (>=7.3.2)", "diff-cover (>=8)", "pyt
 typing = ["typing-extensions (>=4.8)"]
 
 [[package]]
-name = "findpydeps"
-version = "0.2.6"
-description = "Find the python dependencies used by your python files and projects"
-optional = false
-python-versions = ">=3.0"
-files = [
-    {file = "findpydeps-0.2.6-py3-none-any.whl", hash = "sha256:d7e3a817d50ebace22b5beae807d0a50b8e2b7f9cd2cdf1298d7d4f67115cfa1"},
-    {file = "findpydeps-0.2.6.tar.gz", hash = "sha256:573b33f650b759b821c91343caa0008ab03feb71993199a32031e65bff1ecdca"},
-]
-
-[[package]]
 name = "flatbuffers"
 version = "23.5.26"
 description = "The FlatBuffers serialization format for Python"
@@ -2850,21 +2839,6 @@ mic = ["olefile"]
 tests = ["check-manifest", "coverage", "defusedxml", "markdown2", "olefile", "packaging", "pyroma", "pytest", "pytest-cov", "pytest-timeout"]
 typing = ["typing-extensions"]
 xmp = ["defusedxml"]
-
-[[package]]
-name = "pipdeptree"
-version = "2.13.2"
-description = "Command line utility to show dependency tree of packages."
-optional = false
-python-versions = ">=3.8"
-files = [
-    {file = "pipdeptree-2.13.2-py3-none-any.whl", hash = "sha256:0ce50f03a78f688a81265a107dc2fdb2a548d459aedc02824e792485ba884c1d"},
-    {file = "pipdeptree-2.13.2.tar.gz", hash = "sha256:1237791977ef61602dc967b287167c1a6b058501afbc145a04e835c622355e6f"},
-]
-
-[package.extras]
-graphviz = ["graphviz (>=0.20.1)"]
-test = ["covdefaults (>=2.3)", "diff-cover (>=8.0.1)", "pip (>=23.3.1)", "pytest (>=7.4.3)", "pytest-cov (>=4.1)", "pytest-mock (>=3.12)", "virtualenv (>=20.25,<21)"]
 
 [[package]]
 name = "platformdirs"
@@ -5182,4 +5156,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "58944ef969c91357f70b296b586c38e52fad5e5c50ae5d5a7944efd6414e84f6"
+content-hash = "c4b3107d507eb13b54b078f32f32bde0275b53c5cea58b77a043b3c5fd4542ce"
