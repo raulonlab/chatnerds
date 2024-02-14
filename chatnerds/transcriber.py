@@ -58,15 +58,15 @@ class AudioTranscriber:
 
             audio_file_tags = self.read_audio_file_tags(str(audio_file))
 
-            if (self.config.TRANSCRIPT_ADD_SUMMARY):
-                if (self.summarizer is None):
-                    self.summarizer = Summarizer(config=self.config.get_nerd_config())
-                summary = self.summarizer.summarize_text(transcript)
+            # if (self.config.TRANSCRIPT_ADD_SUMMARY is True):
+            #     if (self.summarizer is None):
+            #         self.summarizer = Summarizer(config=self.config.get_nerd_config())
+            #     summary = self.summarizer.summarize_text(transcript)
 
             with open(transcript_file_path, "w", encoding="utf-8") as file:
                 file.write(f"transcript=\"{self.escape_dotenv_value(transcript)}\"\n")
-                if (summary is not None):
-                    file.write(f"summary=\"{self.escape_dotenv_value(summary)}\"\n")
+                # if (summary is not None):
+                #     file.write(f"summary=\"{self.escape_dotenv_value(summary)}\"\n")
                 for tag_key, tag_value in audio_file_tags.items():
                     file.write(f"{tag_key}=\"{self.escape_dotenv_value(tag_value)}\"\n")
 

@@ -8,8 +8,7 @@ from pathlib import Path
 from time import sleep
 from dateutil.parser import parse as dateparse
 import traceback
-# from pytube import YouTube, Playlist
-from pytubefix import YouTube, Playlist
+from pytubefix import YouTube, Playlist, Channel
 import music_tag
 from typing import List, Optional, Union
 import os
@@ -34,27 +33,32 @@ class YoutubeDownloader:
             source_urls = [source_urls]
         
         for source_url in source_urls:
-            if "watch?v=" in source_url:
+            if "/watch?v=" in source_url:
                 self.source_urls.add(source_url)
-            elif "playlist?list=" in source_url:
+            elif "/playlist?list=" in source_url:
                 playlist = Playlist(source_url)
                 self.source_urls = self.source_urls.union(playlist.video_urls)
-            elif "channel/" in source_url:     # See: https://github.com/pytube/pytube/issues/619
-                raise ValueError("Channel URLs not supported yet. See: https://github.com/pytube/pytube/issues/619")
-                # channel = Channel(source_url)
-                # self.source_urls = self.source_urls.union(channel.video_urls)
+            elif "/channel/" in source_url or "/@" in source_url:     
+                channel = Channel(source_url)
+                self.source_urls = self.source_urls.union(channel.video_urls)
     
     def run(self, output_path = ".") -> List[str]:
         logging.info(f"Running youtube downloader with {len(self.source_urls)} urls")
         
         audio_output_file_paths = []
         for source_url in self.source_urls:
-            logging.debug(f"  - downloading {source_url}")
-            audio_output_file_path = self.download(url=source_url, output_path=output_path)
-            if audio_output_file_path:
-                audio_output_file_paths.append(audio_output_file_path)
-            logging.debug(f"  ...waiting {self.config.YOUTUBE_SLEEP_SECONDS_BETWEEN_DOWNLOADS} seconds")
-            sleep(self.config.YOUTUBE_SLEEP_SECONDS_BETWEEN_DOWNLOADS)
+            logging.debug(f"Downloading {source_url}")
+
+            try:
+                audio_output_file_path = self.download(url=source_url, output_path=output_path)
+
+                if audio_output_file_path:
+                    audio_output_file_paths.append(audio_output_file_path)
+
+                    logging.debug(f"  ...waiting {self.config.YOUTUBE_SLEEP_SECONDS_BETWEEN_DOWNLOADS} seconds")
+                    sleep(self.config.YOUTUBE_SLEEP_SECONDS_BETWEEN_DOWNLOADS)
+            except Exception as err:
+                logging.error(f"✘ Error downloading audio from source url: {source_url}", exc_info=err)
 
         logging.info("\nyoutube downloader finished....")
         return audio_output_file_paths
@@ -65,43 +69,49 @@ class YoutubeDownloader:
 
         channel_title = yt.author
         video_title = yt.title
+        try:
+            publish_date = yt.publish_date
+        except Exception as err:
+            logging.watning(f"Error getting publish date of '{video_title}' from channel '{channel_title}' (url: {url})", exc_info=err)
+            publish_date = None
 
         # Audio output file
         audio_output_filename = f"{video_title}.mp3"
-        if self.config.YOUTUBE_ADD_DATE_PREFIX is True and yt.publish_date is not None:
-            date_str = yt.publish_date.strftime("%Y-%m-%d")
+        if self.config.YOUTUBE_ADD_DATE_PREFIX is True and publish_date is not None:
+            date_str = publish_date.strftime("%Y-%m-%d")
             audio_output_filename = f"{date_str} {audio_output_filename}"
-        elif yt.publish_date is None:
-            logging.info(f"Video {video_title} has no publish date. Skipping date prefix.")
+        elif publish_date is None:
+            logging.warning(f"Video '{video_title}' has no publish date. Skipping date prefix.")
         
         # Slugify / fix titles
         if self.config.YOUTUBE_SLUGIFY_PATHS:
-            audio_output_filename = self.slugifyString(audio_output_filename)
-            channel_title = self.slugifyString(channel_title)
+            audio_output_filename = self.slugify_string(audio_output_filename)
+            channel_title = self.slugify_string(channel_title)
         else:
             audio_output_filename = audio_output_filename.replace(os.path.pathsep, "_")
             audio_output_filename = audio_output_filename.replace(os.path.sep, "_")
             channel_title = channel_title.replace(os.path.pathsep, "_")
             channel_title = channel_title.replace(os.path.sep, "_")
-        
+
         # Output path
         if self.config.YOUTUBE_GROUP_BY_AUTHOR:
             output_path = str(Path(output_path, channel_title))
 
         audio_output_file_path = os.path.join(output_path, audio_output_filename)
-        # logging.debug(f"audio_output_file_path: {audio_output_file_path}")
         if os.path.exists(audio_output_file_path):
-            logging.debug(f"Audio file {audio_output_file_path} already exists. Skipping download.")
-            YoutubeDownloader.write_tags(audio_output_file_path, yt)
+            logging.info(f"Audio file '{audio_output_file_path}' already exists. Skipping download.")
+            self.write_tags(audio_output_file_path, yt)
 
-            return audio_output_file_path
+            return None
 
         # Extract audio from video
         audio_output_file_path = None
         try:
+            logging.info(f"Downloading audio of video '{video_title}' from channel '{channel_title}'...")
+        
             video = yt.streams.get_audio_only()
             audio_output_file_path = video.download(
-                mp3=True,
+                mp3=False,      # mp3 == True, ignores filename and uses video title
                 output_path = output_path,
                 filename = audio_output_filename,
                 filename_prefix = None,
@@ -110,7 +120,7 @@ class YoutubeDownloader:
                 # max_retries: Optional[int] = 0
             )
         except Exception as err:
-            logging.error(f"Could not download audio from video {url}: {str(err)}")
+            logging.error(f"✘ Error downloading '{video_title}' from channel '{channel_title}' (url: {url})", exc_info=err)
             traceback.print_exc()
             return None
 
@@ -121,17 +131,17 @@ class YoutubeDownloader:
         
         # Validate downloaded audio file
         if os.path.exists(audio_output_file_path):
-            logging.debug(f"Video downloaded successfully in '{audio_output_file_path}'")
+            logging.info(f"✔ Audio file '{audio_output_file_path}' downloaded successfully.")
 
-            YoutubeDownloader.write_tags(audio_output_file_path, yt)
+            self.write_tags(audio_output_file_path, yt)
             return audio_output_file_path
         else:
-            logging.error(f"{yt.title} could not be downloaded!")
+            logging.error(f"✘ Unable to download audio of '{video_title}' from channel '{channel_title}' (url: {url}). Audio output file path doesn't exist: {audio_output_file_path} ")
             return None
 
 
     @staticmethod
-    def slugifyString(filename: str) -> str:
+    def slugify_string(filename: str) -> str:
         filename = unicodedata.normalize("NFKD", filename).encode("ascii", "ignore")
         filename = re.sub("[^\w\s\-\.]", "", filename.decode("ascii")).strip()
         filename = re.sub("[-\s]+", "-", filename)

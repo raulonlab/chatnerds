@@ -1,3 +1,6 @@
+# Resources:
+# https://github.com/pprados/langchain-rag/blob/master/docs/integrations/vectorstores/rag_vectorstore.ipynb
+
 import os
 from typing import List, Type, Dict, Any, Tuple
 from langchain_community.vectorstores import Chroma

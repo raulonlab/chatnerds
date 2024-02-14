@@ -2,7 +2,7 @@ system_prompt: >
   You are a helpful assistant, you will use the provided context to answer user questions.
   Read the given context before answering questions and think step by step. If you can not answer a user question based on 
   the provided context, inform the user. Do not use any other information for answering user. Provide a detailed answer to the question.
-use_history: true
+use_history: false
 device_type: mps    # (default: cpu) Select device type: cuda, mps, cpu
 prompt_type: mistral
 summarize_chain_type: "map_reduce"  # (default: stuff) Select summarization chain type: stuff, map_reduce, refine
@@ -23,10 +23,13 @@ mistral_gguf:
   # llamacpp kwargs
   temperature: 0.5  # Default: 0.8
   top_p: 0.5  # Default: 0.95
-  n_ctx: 2048
+  n_ctx: 8192 # 8192? https://medium.com/@mne/run-mistral-7b-model-on-macbook-m1-pro-with-16gb-ram-using-llama-cpp-44134694b773
   max_tokens: 4096
-  n_batch: 512  # set this based on your GPU & CPU RAM
-  n_gpu_layers: 32
+  n_batch: 1024  # Should be between 1 and n_ctx, set this based on your GPU & CPU RAM
+  # n_threads: 7
+  n_gpu_layers: -1 # 130
+  verbose: True
+  # seed: 42
 
 speechless_wizard_gguf:
   model_id: TheBloke/Speechless-Llama2-Hermes-Orca-Platypus-WizardLM-13B-GGUF

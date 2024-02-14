@@ -3,7 +3,8 @@ from rich import print
 from rich.markup import escape
 from rich.panel import Panel
 from datetime import datetime
-from .langchain_chains import get_retrieval_qa
+from langchain.callbacks.tracers import ConsoleCallbackHandler
+from .llms.chain_factory import ChainFactory
 
 QA_LOG_PATH = "./chatnerds_qa.log"
 
@@ -29,8 +30,9 @@ def get_log_header(config: Dict[str, Any]) -> str:
     return log
 
 def chat(config: Dict[str, Any], query: Optional[str] = None) -> None:
-    qa = get_retrieval_qa(config, callback=handle_answer)
-    # qa = get_retrieval_qa(config)
+    # qa = get_retrieval_qa(config, callback=handle_answer)
+    # chat_chain = ChainFactory(config).get_chain()
+    chat_chain = ChainFactory(config).get_rag_fusion_chain()
 
     interactive = not query
     print()
@@ -54,26 +56,30 @@ def chat(config: Dict[str, Any], query: Optional[str] = None) -> None:
         log_query = f"Q:\n{escape(query)}\nA:\n"
         write_qa_log(f"{get_log_header(config)}{log_query}")
 
-        res = qa(query)
-
-        if "result" in res:
-            handle_answer(res["result"])
-        else:
-            handle_answer("No response result found!")
+        res = chat_chain.invoke({ "question": query },
+                 config={'callbacks': [ConsoleCallbackHandler()]})
+        handle_answer(res)
+        
+        # if "result" in res:
+        #     handle_answer(res["result"])
+        # else:
+        #     # handle_answer("No response result found!")
+        #     handle_answer(res)
 
         print()
-        log_sources = "\nSources:\n"
-        for doc in res["source_documents"]:
-            source, content = doc.metadata["source"], doc.page_content
-            log_sources += f"- {source}\n"
-            print(
-                Panel(
-                    f"[bright_blue]{escape(source)}[/bright_blue]\n\n{escape(content)}"
+        if "source_documents" in res:
+            log_sources = "\nSources:\n"
+            for doc in res["source_documents"]:
+                source, content = doc.metadata["source"], doc.page_content
+                log_sources += f"- {source}\n"
+                print(
+                    Panel(
+                        f"[bright_blue]{escape(source)}[/bright_blue]\n\n{escape(content)}"
+                    )
                 )
-            )
 
-        write_qa_log(log_sources)
-        print()
+            write_qa_log(log_sources)
+            print()
 
         if not interactive:
             break

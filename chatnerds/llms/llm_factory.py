@@ -149,7 +149,8 @@ class LLMFactory:
 
             if device_type.lower() == "mps":
                 kwargs["n_gpu_layers"] = 1
-                logging.info(f"Using MPS for GGUF/GGML quantized models. n_gpu_layers={kwargs['n_gpu_layers']}")
+                kwargs["f16_kv"] = True  # MUST set to True, otherwise you will run into problem after a couple of calls
+                logging.info("Using MPS for GGUF/GGML quantized models")
 
             llm = LlamaCpp(model_path=model_path, **kwargs)
 
