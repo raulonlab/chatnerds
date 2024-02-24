@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import re
+from time import sleep
 from typing import List, Optional
 import unicodedata
 import urllib.error
 import xml.etree.ElementTree as etree
 from contextlib import nullcontext
 from os import makedirs, path, remove
-# from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 import logging
 import feedparser
@@ -16,13 +16,11 @@ import music_tag
 from dateutil.parser import parse as dateparse
 from feedparser import CharacterEncodingOverride
 from tqdm import tqdm
-from .config import Config
+from chatnerds.config import Config
 
 # podcast_archiver settings: https://github.com/janw/podcast-archiver/blob/main/podcast_archiver/config.py
-USER_AGENT = f"podcast-archiver/dev (https://github.com/janw/podcast-archiver)"
+_USER_AGENT = f"podcast-archiver/dev (https://github.com/janw/podcast-archiver)"
 
-# if TYPE_CHECKING:
-#     from podcast_archiver.config import Settings
 
 class PodcastDownloader:
     _global_info_keys = [
@@ -44,7 +42,10 @@ class PodcastDownloader:
 
     feedlist: set
     config: Config = Optional[Config]
-    def __init__(self, feeds: List[str] = [], opml_files: List[str] = [], config: Config = None):
+
+    def __init__(
+        self, feeds: List[str] = [], opml_files: List[str] = [], config: Config = None
+    ):
         if config:
             self.config = config
         else:
@@ -57,7 +58,7 @@ class PodcastDownloader:
             self.parseOpmlFile(opml)
 
         self.session = requests.Session()
-        self.session.headers.update({"user-agent": USER_AGENT})
+        self.session.headers.update({"user-agent": _USER_AGENT})
 
     def addFeed(self, feed):
         if path.isfile(feed):
@@ -71,13 +72,19 @@ class PodcastDownloader:
             tree = etree.fromstringlist(file)
 
         for feed in [
-            node.get("xmlUrl") for node in tree.findall("*/outline/[@type='rss']") if node.get("xmlUrl") is not None
+            node.get("xmlUrl")
+            for node in tree.findall("*/outline/[@type='rss']")
+            if node.get("xmlUrl") is not None
         ]:
             self.addFeed(feed)
 
     def processFeed(self, feed_url, output_path="."):
         if self.config.VERBOSE > 0:
-            print(f"\nDownloading archive for: {feed_url}\n1. Gathering link list ...", end="", flush=True)
+            print(
+                f"\nDownloading archive for: {feed_url}\n1. Gathering link list ...",
+                end="",
+                flush=True,
+            )
 
         linklist, feed_info = self.processPodcastLink(feed_url, output_path=output_path)
         if self.config.VERBOSE == 1:
@@ -111,7 +118,9 @@ class PodcastDownloader:
 
         return filename
 
-    def linkToTargetFilename(self, link, feed_info, must_have_ext=False, episode_info=None, output_path="."):
+    def linkToTargetFilename(
+        self, link, feed_info, must_have_ext=False, episode_info=None, output_path="."
+    ):
         linkpath = urlparse(link).path
         basename = path.basename(linkpath)
         feed_title = feed_info["title"]
@@ -142,7 +151,9 @@ class PodcastDownloader:
 
     def parseFeedToNextPage(self, feedobj):
         # Assuming there will only be one link declared as 'next'
-        feed_next_page = [link["href"] for link in feedobj["feed"]["links"] if link["rel"] == "next"]
+        feed_next_page = [
+            link["href"] for link in feedobj["feed"]["links"] if link["rel"] == "next"
+        ]
         if len(feed_next_page) > 0:
             return feed_next_page[0]
 
@@ -182,7 +193,9 @@ class PodcastDownloader:
 
         feedobj = feedparser.parse(response.content)
         # Escape malformatted XML; If the character encoding is wrong, continue as long as the reparsing succeeded
-        if feedobj["bozo"] == 1 and not isinstance(feedobj["bozo_exception"], CharacterEncodingOverride):
+        if feedobj["bozo"] == 1 and not isinstance(
+            feedobj["bozo_exception"], CharacterEncodingOverride
+        ):
             print("\nDownloaded feed is malformatted on", feed_url)
             return None
 
@@ -193,16 +206,22 @@ class PodcastDownloader:
         if self.config.PODCAST_UPDATE_ARCHIVE:
             for index, episode_dict in enumerate(linklist):
                 link = episode_dict["url"]
-                filename = self.linkToTargetFilename(link, feed_info, output_path=output_path)
+                filename = self.linkToTargetFilename(
+                    link, feed_info, output_path=output_path
+                )
 
                 if path.isfile(filename):
                     del linklist[index:]
                     if self.config.VERBOSE > 1:
-                        print(f" found existing episodes, {len(linklist)} new to process")
+                        print(
+                            f" found existing episodes, {len(linklist)} new to process"
+                        )
                     return True, linklist
 
         # On given option, crop linklist to maximum number of episodes
-        if (max_count := self.config.PODCAST_MAXIMUM_EPISODE_COUNT) > 0 and max_count < len(linklist):
+        if (
+            max_count := self.config.PODCAST_MAXIMUM_EPISODE_COUNT
+        ) > 0 and max_count < len(linklist):
             linklist = linklist[0:max_count]
             if self.config.VERBOSE > 1:
                 print(f" reached maximum episode count of {max_count}")
@@ -234,7 +253,9 @@ class PodcastDownloader:
             # Parse the feed object for episodes and the next page
             linklist += self.parseFeedToLinks(feedobj)
             feed_next_page = self.parseFeedToNextPage(feedobj)
-            was_truncated, linklist = self.truncateLinkList(linklist, feed_info, output_path=output_path)
+            was_truncated, linklist = self.truncateLinkList(
+                linklist, feed_info, output_path=output_path
+            )
 
             if not feed_next_page or was_truncated:
                 break
@@ -247,9 +268,16 @@ class PodcastDownloader:
         linklist.reverse()
         return linklist, feed_info
 
-    def checkEpisodeExistsPreflight(self, link, *, feed_info, episode_dict, output_path="."):
+    def checkEpisodeExistsPreflight(
+        self, link, *, feed_info, episode_dict, output_path="."
+    ):
         # Check existence once ...
-        filename = self.linkToTargetFilename(link, feed_info=feed_info, episode_info=episode_dict, output_path=output_path)
+        filename = self.linkToTargetFilename(
+            link,
+            feed_info=feed_info,
+            episode_info=episode_dict,
+            output_path=output_path,
+        )
 
         if self.config.VERBOSE > 1:
             print("\tLocal filename:", filename)
@@ -263,17 +291,33 @@ class PodcastDownloader:
 
     def logDownloadHeader(self, link, episode_dict, *, index, total):
         if self.config.VERBOSE == 1:
-            print("\r2. Downloading episodes ... {0}/{1}".format(index + 1, total), end="", flush=True)
+            print(
+                "\r2. Downloading episodes ... {0}/{1}".format(index + 1, total),
+                end="",
+                flush=True,
+            )
         elif self.config.VERBOSE > 1:
-            print("\n\tDownloading episode no. {0}/{1}:\n\t{2}".format(index + 1, total, link))
+            print(
+                "\n\tDownloading episode no. {0}/{1}:\n\t{2}".format(
+                    index + 1, total, link
+                )
+            )
         if self.config.VERBOSE > 2:
             print("\tEpisode info:")
             for key, value in episode_dict.items():
                 print("\t * %10s: %s" % (key, value))
 
-    def processResponse(self, response, *, filename, feed_info, episode_dict, output_path="."):
+    def processResponse(
+        self, response, *, filename, feed_info, episode_dict, output_path="."
+    ):
         # Check existence another time, with resolved link
-        new_filename = self.linkToTargetFilename(response.url, feed_info, must_have_ext=True, episode_info=episode_dict, output_path=output_path)
+        new_filename = self.linkToTargetFilename(
+            response.url,
+            feed_info,
+            must_have_ext=True,
+            episode_info=episode_dict,
+            output_path=output_path,
+        )
 
         if new_filename and new_filename != filename:
             filename = new_filename
@@ -293,7 +337,9 @@ class PodcastDownloader:
             if self.config.VERBOSE < 2:
                 print(f"\nDownloading {filename}")
             total_size = int(response.headers.get("content-length", "0"))
-            progress_bar = tqdm(total=total_size, unit="B", unit_scale=True, unit_divisor=1024)
+            progress_bar = tqdm(
+                total=total_size, unit="B", unit_scale=True, unit_divisor=1024
+            )
             callback = progress_bar.update
         else:
             progress_bar = nullcontext()
@@ -301,16 +347,27 @@ class PodcastDownloader:
 
         with progress_bar, open(filename, "wb") as outfile:
             self.prettyCopyfileobj(response, outfile, callback=callback)
-        
-        PodcastDownloader.write_tags(filename, episode_dict)
+
+        self.write_tags(filename, episode_dict)
 
     def downloadEpisode(self, link, *, feed_info, episode_dict, output_path="."):
-        filename = self.checkEpisodeExistsPreflight(link, feed_info=feed_info, episode_dict=episode_dict, output_path=output_path)
+        filename = self.checkEpisodeExistsPreflight(
+            link,
+            feed_info=feed_info,
+            episode_dict=episode_dict,
+            output_path=output_path,
+        )
         if not filename:
             return
         try:
             response = self.session.get(link, stream=True, allow_redirects=True)
-            self.processResponse(response, filename=filename, feed_info=feed_info, episode_dict=episode_dict, output_path=output_path)
+            self.processResponse(
+                response,
+                filename=filename,
+                feed_info=feed_info,
+                episode_dict=episode_dict,
+                output_path=output_path,
+            )
             if self.config.VERBOSE > 1:
                 print("\t✓ Download successful.")
         except (urllib.error.HTTPError, urllib.error.URLError) as error:
@@ -318,7 +375,9 @@ class PodcastDownloader:
                 logging.error("\t✗ Download failed. Query returned '%s'" % error)
         except KeyboardInterrupt:
             if self.config.VERBOSE > 0:
-                logging.error("\n\t✗ Unexpected interruption. Deleting unfinished file.")
+                logging.error(
+                    "\n\t✗ Unexpected interruption. Deleting unfinished file."
+                )
 
             remove(filename)
             raise
@@ -329,7 +388,12 @@ class PodcastDownloader:
             link = episode_dict["url"]
 
             self.logDownloadHeader(link, episode_dict, index=cnt, total=nlinks)
-            self.downloadEpisode(link, feed_info=feed_info, episode_dict=episode_dict, output_path=output_path)
+            self.downloadEpisode(
+                link,
+                feed_info=feed_info,
+                episode_dict=episode_dict,
+                output_path=output_path,
+            )
 
     def prettyCopyfileobj(self, fsrc, fdst, callback, block_size=512 * 1024):
         for chunk in fsrc.iter_content(block_size):
@@ -339,6 +403,18 @@ class PodcastDownloader:
 
     @staticmethod
     def write_tags(filepath: str, episode_dict: dict, feed_dict: dict = None) -> None:
-        music_tag_file = music_tag.load_file(filepath)
+        music_tag_file = None
+
+        try:
+            music_tag_file = music_tag.load_file(filepath)
+        except:
+            # Retry after 1 second
+            sleep(1)
+            try:
+                music_tag_file = music_tag.load_file(filepath)
+            except:
+                logging.error(f"✘ Unable to write file tags in '{filepath}'")
+                return
+
         music_tag_file["comment"] = episode_dict.get("url")
         music_tag_file.save()

@@ -20,14 +20,13 @@ class TranscriptLoader(BaseLoader):
         """Initialize with file path."""
         self.file_path = file_path
 
-
     def load(self) -> List[Document]:
         """Load from file path."""
 
         transcript_dict = dotenv_values(self.file_path)
 
         page_content = transcript_dict.pop("transcript")
+        transcript_dict.pop("summary", None)  # Ignore summary for now
         metadata = {"source": self.file_path, **transcript_dict}
-        
-        return [Document(page_content=page_content, metadata=metadata)]
 
+        return [Document(page_content=page_content, metadata=metadata)]

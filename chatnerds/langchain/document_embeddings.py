@@ -4,10 +4,12 @@ from pathlib import Path
 from typing import Any, Dict, List, Union
 from multiprocessing import Pool
 from tqdm import tqdm
-import openai
-from langchain_community.embeddings import HuggingFaceInstructEmbeddings, HuggingFaceEmbeddings
-from langchain.embeddings.base import Embeddings
-from langchain.docstore.document import Document
+from langchain_community.embeddings import (
+    HuggingFaceInstructEmbeddings,
+    HuggingFaceEmbeddings,
+)
+from langchain_core.embeddings import Embeddings
+from langchain_core.documents import Document
 from langchain_community.document_loaders import (
     CSVLoader,
     EverNoteLoader,
@@ -21,19 +23,16 @@ from langchain_community.document_loaders import (
     UnstructuredWordDocumentLoader,
 )
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.docstore.document import Document
-from .document_loaders.open_ai_whisper_loader import OpenAIWhisperLoader
-from .document_loaders.transcript_loader import TranscriptLoader
-from .chroma_database import ChromaDatabase
-from .config import Config
-
-global_config = Config.environment_instance()
-
-openai.api_key = global_config.OPENAI_API_KEY
+from langchain_core.documents import Document
+from chatnerds.document_loaders import TranscriptLoader
+from chatnerds.langchain.chroma_database import (
+    ChromaDatabase,
+    DEFAULT_SOURCES_COLLECTION_NAME,
+)
 
 
 # Map file extensions to document loaders and their arguments
-LOADER_MAPPING = {
+_LOADER_MAPPING = {
     ".csv": (CSVLoader, {"encoding": "utf8"}),
     ".doc": (UnstructuredWordDocumentLoader, {}),
     ".docx": (UnstructuredWordDocumentLoader, {}),
@@ -54,10 +53,11 @@ LOADER_MAPPING = {
 
 class DocumentEmbeddings:
     config: Dict[str, Any] = {}
+
     def __init__(self, config: Dict[str, Any]):
         self.config = config
 
-    def get_embeddings(self) -> Embeddings:
+    def get_embedding_function(self) -> Embeddings:
         embeddings_config = {**self.config["embeddings"]}
         if embeddings_config["model_name"].startswith("hkunlp/"):
             provider_class = HuggingFaceInstructEmbeddings
@@ -65,19 +65,22 @@ class DocumentEmbeddings:
             provider_class = HuggingFaceEmbeddings
         return provider_class(**embeddings_config)
 
-
     def embed_directories(self, source_directories: List[Union[str, Path]]) -> None:
-        embeddings = self.get_embeddings()
+        embeddings = self.get_embedding_function()
 
         sources_database = ChromaDatabase(
-            embeddings=embeddings, 
-            config=self.config["chroma"], 
-            collection_name="source_documents"
-            )
+            embeddings=embeddings,
+            config=self.config["chroma"],
+            collection_name=DEFAULT_SOURCES_COLLECTION_NAME,
+        )
 
         # Get existing sources to not embed them again
         collection = sources_database.client.get()
-        all_sources = [metadata["source"] for metadata in collection["metadatas"] if collection.get("metadatas") is not None]
+        all_sources = [
+            metadata["source"]
+            for metadata in collection["metadatas"]
+            if collection.get("metadatas") is not None
+        ]
 
         existing_sources = []
         for source in all_sources:
@@ -87,27 +90,27 @@ class DocumentEmbeddings:
         source_documents = []
         for source_directory in source_directories:
             # Load source documents
-            documents = self.load_documents(source_directory, ignored_files=existing_sources)
+            documents = self.load_documents(
+                source_directory, ignored_files=existing_sources
+            )
             if len(documents) > 0:
                 source_documents.extend(documents)
-        
-        if (len(source_documents) == 0):
+
+        if len(source_documents) == 0:
             return
-        
+
         # Add source documents to the database
         sources_database.add_documents(source_documents)
-    
+
         # Split documents into chunks
-        document_chunks = self.split_documents(source_documents)
+        chunk_documents = self.split_documents(source_documents)
 
         # Add chunks to the database
-        if (len(document_chunks) > 0):
+        if len(chunk_documents) > 0:
             chunks_database = ChromaDatabase(
-                embeddings=embeddings, 
-                config=self.config["chroma"]
-                )
-            chunks_database.add_documents(document_chunks)
-
+                embeddings=embeddings, config=self.config["chroma"]
+            )
+            chunks_database.add_documents(chunk_documents)
 
     @classmethod
     def split_documents(cls, documents: List[Document]) -> List[Document]:
@@ -115,28 +118,29 @@ class DocumentEmbeddings:
         Load documents and split in chunks
         """
 
-        text_splitter = RecursiveCharacterTextSplitter(separators=["\n\n", "\n", ".", " "], chunk_size=900, chunk_overlap=50)    # chunk_size=500, chunk_overlap=50
-        
+        text_splitter = RecursiveCharacterTextSplitter(
+            separators=["\n\n", "\n", ".", " "], chunk_size=900, chunk_overlap=50
+        )  # chunk_size=500, chunk_overlap=50
+
         texts, metadatas = [], []
         for document in documents:
             texts.append(document.page_content)
-            metadatas.append({
-                "parent_source": document.metadata["source"],
-                **document.metadata 
-                }
+            metadatas.append(
+                {"parent_source": document.metadata["source"], **document.metadata}
             )
-    
+
         chunks = text_splitter.create_documents(texts, metadatas=metadatas)
         return chunks
 
-
     @classmethod
-    def load_documents(cls, source_dir: str, ignored_files: List[str] = []) -> List[Document]:
+    def load_documents(
+        cls, source_dir: str, ignored_files: List[str] = []
+    ) -> List[Document]:
         """
         Loads all documents from the source documents directory, ignoring specified files
         """
         all_files = []
-        for ext in LOADER_MAPPING:
+        for ext in _LOADER_MAPPING:
             all_files.extend(
                 glob.glob(os.path.join(source_dir, f"**/*{ext}"), recursive=True)
             )
@@ -144,7 +148,7 @@ class DocumentEmbeddings:
             file_path for file_path in all_files if file_path not in ignored_files
         ]
 
-        if (len(filtered_files) == 0):
+        if len(filtered_files) == 0:
             return []
 
         with Pool(processes=os.cpu_count()) as pool:
@@ -160,16 +164,14 @@ class DocumentEmbeddings:
 
         return results
 
-
     @classmethod
     def load_single_document(cls, file_path: str) -> List[Document]:
         ext = "." + file_path.rsplit(".", 1)[-1]
-        if ext in LOADER_MAPPING:
-            loader_class, loader_args = LOADER_MAPPING[ext]
+        if ext in _LOADER_MAPPING:
+            loader_class, loader_args = _LOADER_MAPPING[ext]
             loader = loader_class(file_path, **loader_args)
             loader_documents = loader.load()
 
             return loader_documents
 
         raise ValueError(f"Unsupported file extension '{ext}'")
-

@@ -13,23 +13,29 @@ import logging.handlers
 from typing import Union
 
 # Define default logfile format.
-file_name_format = "{year:04d}{month:02d}{day:02d}-"\
-    "{hour:02d}{minute:02d}{second:02d}.log"
+file_name_format = (
+    "{year:04d}{month:02d}{day:02d}-" "{hour:02d}{minute:02d}{second:02d}.log"
+)
 
 # Define the default logging message formats.
 file_msg_format = "%(asctime)s %(levelname)-8s: %(message)s"
 console_msg_format = "%(message)s"
 
 # Define the log rotation criteria.
-max_bytes=1024**2
-backup_count=100
+max_bytes = 1024**2
+backup_count = 100
 
-def setup(log_terminal_level: Union[str, int]=logging.DEBUG, log_file_level: Union[str, int, None]=None, log_file_path: str="chatnerds.log" ):
-    """ Set up dual logging to console and to logfile.
 
-    When this function is called, it first creates the given logging output directory. 
-    It then creates a logfile and passes all log messages to come to it. 
-    The name of the logfile encodes the date and time when it was created, for example "20181115-153559.log". 
+def setup(
+    log_terminal_level: Union[str, int] = logging.DEBUG,
+    log_file_level: Union[str, int, None] = None,
+    log_file_path: str = "chatnerds.log",
+):
+    """Set up dual logging to console and to logfile.
+
+    When this function is called, it first creates the given logging output directory.
+    It then creates a logfile and passes all log messages to come to it.
+    The name of the logfile encodes the date and time when it was created, for example "20181115-153559.log".
     All messages with a certain minimum log level are also forwarded to the console.
 
     Args:
@@ -68,9 +74,15 @@ def setup(log_terminal_level: Union[str, int]=logging.DEBUG, log_file_level: Uni
     # Set up logging to the logfile.
     # file_handler = logging.handlers.RotatingFileHandler(
     #     filename=file_name, maxBytes=max_bytes, backupCount=backup_count)
-    
+
     if log_file_level is not None and log_file_level != logging.NOTSET:
-        file_handler = logging.handlers.TimedRotatingFileHandler(filename=log_file_path, when="midnight", interval=1, backupCount=10, utc=True)
+        file_handler = logging.handlers.TimedRotatingFileHandler(
+            filename=log_file_path,
+            when="midnight",
+            interval=1,
+            backupCount=10,
+            utc=True,
+        )
         file_handler.setLevel(log_file_level)
         file_formatter = logging.Formatter(file_msg_format)
         file_handler.setFormatter(file_formatter)
@@ -86,8 +98,7 @@ def setup(log_terminal_level: Union[str, int]=logging.DEBUG, log_file_level: Uni
 
 
 if __name__ == "__main__":
-    """Illustrate the usage of the duallog package.
-    """
+    """Illustrate the usage of the duallog package."""
 
     # Set up dual logging.
     setup("logtest")

@@ -1,32 +1,18 @@
 import logging
-from rich import print
-from pathlib import Path
-from typing import Any, Callable, Dict, Optional, List
-from langchain.callbacks.base import BaseCallbackHandler
-from langchain_community.llms import LlamaCpp, HuggingFacePipeline
+from typing import Any, Callable, Dict, Optional
 from langchain.llms.base import LLM as LLMBase
-from huggingface_hub import hf_hub_download
-from auto_gptq import AutoGPTQForCausalLM
-from transformers import (
-    AutoModelForCausalLM,
-    AutoTokenizer,
-    LlamaForCausalLM,
-    LlamaTokenizer,
-    GenerationConfig,
-    pipeline,
-    # TextGenerationPipeline,
-    MODEL_FOR_CAUSAL_LM_MAPPING,
-)
 
 
 class LLMFactory:
     config: Dict[str, Any] = {}
     callback: Optional[Callable[[str], None]] = None
 
-    def __init__(self, config: Dict[str, Any], callback: Optional[Callable[[str], None]] = None):
+    def __init__(
+        self, config: Dict[str, Any], callback: Optional[Callable[[str], None]] = None
+    ):
         self.config = config
         self.callback = callback
-    
+
     def get_llm(self) -> LLMBase:
         # class CallbackHandler(BaseCallbackHandler):
         #     def on_llm_new_token(self, token: str, **kwargs) -> None:
@@ -38,35 +24,76 @@ class LLMFactory:
 
         if selected_llm not in self.config:
             raise ValueError(f"LLM config '{selected_llm}' not found in config file.")
-        
-        selected_llm_config = self.config[selected_llm]
-        
-        llm = self.load_llm_from_config(device_type=device_type, **selected_llm_config)
 
-        return llm
+        selected_llm_config = dict(self.config[selected_llm])
+
+        llm_provider = selected_llm_config.pop("provider", "llamacpp")
+        prompt_type = selected_llm_config.pop("prompt_type", None)
+
+        match llm_provider:
+            case "ollama":
+                # standarize model, model_id, model_name
+                if selected_llm_config["model"] is None:
+                    selected_llm_config["model"] = selected_llm_config.pop(
+                        "model_id", None
+                    ) or selected_llm_config.pop("model_name", None)
+
+                from langchain_community.chat_models import ChatOllama
+
+                llm = ChatOllama(**selected_llm_config)
+            case "openai":
+                # standarize model, model_id, model_name
+                if selected_llm_config["model_name"] is None:
+                    selected_llm_config["model_name"] = selected_llm_config.pop(
+                        "model_id", None
+                    ) or selected_llm_config.pop("model", None)
+
+                from langchain_openai import ChatOpenAI
+
+                llm = ChatOpenAI(**selected_llm_config)
+            case "llamacpp":
+                llm = self.load_llm_from_config(
+                    device_type=device_type, **selected_llm_config
+                )
+            case _:
+                raise ValueError(
+                    f"Uknown LLM provider '{llm_provider}'. Please use 'ollama', 'openai' or 'llamacpp'."
+                )
+
+        return llm, prompt_type
 
     @classmethod
-    def load_llm_from_config(cls, model_id, model_basename=None, device_type=None, **kwargs) -> LLMBase:
+    def load_llm_from_config(
+        cls, model_id, model_basename=None, device_type=None, **kwargs
+    ) -> LLMBase:
         logging.info(f"Loading Model: '{model_id}', device_type: '{device_type}'")
         logging.info("This action can take a few minutes!")
-        # print("kwargs: ")
-        # print(kwargs)
 
         if model_basename is not None:
             model_basename_lowered = model_basename.lower()
-    
+
             # Use LamaCpp / HuggingFacePipeline for GGUF/GGML quantized models
             if ".gguf" in model_basename_lowered:
-                llm = cls._load_quantized_model_gguf_ggml(model_id, model_basename, device_type, **kwargs)
+                llm = cls._load_quantized_model_gguf_ggml(
+                    model_id, model_basename, device_type, **kwargs
+                )
                 return llm
             elif ".ggml" in model_basename_lowered:
-                model, tokenizer = cls._load_quantized_model_gguf_ggml(model_id, model_basename, device_type, **kwargs)
+                model, tokenizer = cls._load_quantized_model_gguf_ggml(
+                    model_id, model_basename, device_type, **kwargs
+                )
             # Use AutoGPTQForCausalLM for GPTQ quantized models
             else:
-                model, tokenizer = cls._load_quantized_model_qptq(model_id, model_basename, device_type, **kwargs)
+                model, tokenizer = cls._load_quantized_model_qptq(
+                    model_id, model_basename, device_type, **kwargs
+                )
         else:
-            # Use LlamaForCausalLM (cpu / mps devices) or AutoModelForCausalLM (cuda devices) 
-            model, tokenizer = cls._load_full_model(model_id, model_basename, device_type, **kwargs)
+            # Use LlamaForCausalLM (cpu / mps devices) or AutoModelForCausalLM (cuda devices)
+            model, tokenizer = cls._load_full_model(
+                model_id, model_basename, device_type, **kwargs
+            )
+
+        from transformers import GenerationConfig, pipeline
 
         # Load configuration from the model to avoid warnings
         generation_config = GenerationConfig.from_pretrained(model_id)
@@ -74,20 +101,12 @@ class LLMFactory:
         # https://huggingface.co/docs/transformers/
         # main_classes/text_generation#transformers.GenerationConfig.from_pretrained.returns
 
-        # print("generation_config:")
-        # print(generation_config)
-        # print("model:")
-        # print(model)
-
         # Create a pipeline for text generation
-        # pipe = TextGenerationPipeline(
-        #     task="text-generation",
         pipe = pipeline(
             "text-generation",
             model=model,
             tokenizer=tokenizer,
             # device=torch.device("cpu"),
-
             # https://artificialcorner.com/run-mistral7b-quantized-for-free-on-any-computer-2cadc18b45a2
             # max_new_tokens=512,
             # do_sample=True,
@@ -95,7 +114,6 @@ class LLMFactory:
             # top_p=0.95,
             # top_k=40,
             # repetition_penalty=1.1
-
             # max_length=kwargs["max_tokens"],     # MAX_NEW_TOKENS,
             # temperature=0.2,
             # top_p=0.95,
@@ -103,16 +121,18 @@ class LLMFactory:
             # max_new_tokens=512,
             generation_config=generation_config,
         )
-        # pipe.model.to("mps")
+
+        from langchain_community.llms import HuggingFacePipeline
 
         llm = HuggingFacePipeline(pipeline=pipe)
         logging.info("Local LLM Loaded")
 
         return llm
 
-
     @staticmethod
-    def _load_quantized_model_gguf_ggml(model_id, model_basename, device_type, **kwargs):
+    def _load_quantized_model_gguf_ggml(
+        model_id, model_basename, device_type, **kwargs
+    ):
         """
         Load a GGUF/GGML quantized model using LlamaCpp.
         Langchain docs: https://python.langchain.com/docs/integrations/llms/llamacpp#installation-with-metal
@@ -140,6 +160,8 @@ class LLMFactory:
         logging.info("Using Llamacpp for GGUF/GGML quantized models")
 
         try:
+            from huggingface_hub import hf_hub_download
+
             model_path = hf_hub_download(
                 repo_id=model_id,
                 filename=model_basename,
@@ -149,8 +171,12 @@ class LLMFactory:
 
             if device_type.lower() == "mps":
                 kwargs["n_gpu_layers"] = 1
-                kwargs["f16_kv"] = True  # MUST set to True, otherwise you will run into problem after a couple of calls
+                kwargs["f16_kv"] = (
+                    True  # MUST set to True, otherwise you will run into problem after a couple of calls
+                )
                 logging.info("Using MPS for GGUF/GGML quantized models")
+
+            from langchain_community.llms import LlamaCpp
 
             llm = LlamaCpp(model_path=model_path, **kwargs)
 
@@ -158,44 +184,10 @@ class LLMFactory:
         except Exception as err:
             logging.error(f"Error loading GGUF/GGML model: {err}")
             if "ggml" in model_basename:
-                logging.info("If you were using GGML model, LLAMA-CPP Dropped Support, Use GGUF Instead")
+                logging.info(
+                    "If you were using GGML model, LLAMA-CPP Dropped Support, Use GGUF Instead"
+                )
             return None
-
-
-    @staticmethod
-    def _load_quantized_model_gguf_ggml_huggingface(model_id, model_basename, device_type, **kwargs):
-        """
-        Load a GGUF/GGML quantized model using HuggingFacePipeline.
-
-        pip uninstall llama-cpp-python -y
-        CMAKE_ARGS="-DLLAMA_METAL=on" FORCE_CMAKE=1 pipenv install -U llama-cpp-python==0.1.83
-
-        This function attempts to load a GGUF/GGML quantized model using the HuggingFacePipeline library.
-
-        Parameters:
-        - model_id (str): The identifier for the model on HuggingFace Hub.
-        - model_basename (str): The base name of the model file.
-        - device_type (str): The type of device where the model will run, e.g., 'mps', 'cuda', etc.
-
-        Returns:
-        - HuggingFace model: An instance of the HuggingFace model if successful, otherwise None.
-        """
-
-        logging.info("Using HuggingFacePipeline.from_model_id")
-        # print("kwargs: ")
-        # print(kwargs)
-
-        if model_id is None:
-            raise ValueError("model_id is required for HuggingFace models")
-        
-        llm = HuggingFacePipeline.from_model_id(
-            task="text-generation",
-            model_id=model_id,
-            **kwargs,
-        )
-
-        return llm
-
 
     @staticmethod
     def _load_quantized_model_qptq(model_id, model_basename, device_type, **kwargs):
@@ -221,8 +213,6 @@ class LLMFactory:
         # The code supports all huggingface models that ends with GPTQ and have some variation
         # of .no-act.order or .safetensors in their HF repo.
         logging.info("Using AutoGPTQForCausalLM for quantized models")
-        # print("kwargs: ")
-        # print(kwargs)
 
         use_safetensors = False
         if ".safetensors" in model_basename:
@@ -230,8 +220,12 @@ class LLMFactory:
             use_safetensors = True
             model_basename = model_basename.replace(".safetensors", "")
 
+        from transformers import AutoTokenizer
+
         tokenizer = AutoTokenizer.from_pretrained(model_id, use_fast=True)
         logging.info("Tokenizer loaded")
+
+        from auto_gptq import AutoGPTQForCausalLM
 
         model = AutoGPTQForCausalLM.from_quantized(
             model_id,
@@ -246,10 +240,8 @@ class LLMFactory:
             # offload_folder="offload",
             **kwargs,
         )
-        # MODEL_FOR_CAUSAL_LM_MAPPING.register("chatnerds-gptq", model.__class__)
 
         return model, tokenizer
-
 
     @staticmethod
     def _load_full_model(model_id, model_basename, device_type, **kwargs):
@@ -274,17 +266,26 @@ class LLMFactory:
         - Additional settings are provided for NVIDIA GPUs, such as loading in 4-bit and setting the compute dtype.
         """
 
+        from transformers import (
+            AutoModelForCausalLM,
+            AutoTokenizer,
+            LlamaForCausalLM,
+            LlamaTokenizer,
+        )
+
         if device_type.lower() in ["mps", "cpu"]:
             logging.info("Using LlamaTokenizer")
-            tokenizer = LlamaTokenizer.from_pretrained(model_id)  # cache_dir="./models/"
+            tokenizer = LlamaTokenizer.from_pretrained(
+                model_id
+            )  # cache_dir="./models/"
             model = LlamaForCausalLM.from_pretrained(
-                model_id,
-                device_map="auto",
-                **kwargs
+                model_id, device_map="auto", **kwargs
             )  # cache_dir="./models/"
         else:
             logging.info("Using AutoModelForCausalLM for full models")
-            tokenizer = AutoTokenizer.from_pretrained(model_id, use_fast=True)  # cache_dir="./models/"
+            tokenizer = AutoTokenizer.from_pretrained(
+                model_id, use_fast=True
+            )  # cache_dir="./models/"
             model = AutoModelForCausalLM.from_pretrained(
                 model_id,
                 device_map="auto",
@@ -302,5 +303,5 @@ class LLMFactory:
                 **kwargs,
             )
             model.tie_weights()
-        
+
         return model, tokenizer

@@ -2,16 +2,18 @@ import os
 import shutil
 from pathlib import Path
 import logging
-from typing import Dict
 import typer
-from .config import Config
+from chatnerds.config import Config
 
 YOUTUBE_SOURCES_INITIAL_CONTENT = """
+# video urls
+# https://www.youtube.com/watch?v=...
+
 # playlist urls
 # https://www.youtube.com/playlist?list=...
 
-# video urls
-# https://www.youtube.com/watch?v=...
+# channel urls
+# https://www.youtube.com/@...
 """
 PODCAST_SOURCES_INITIAL_CONTENT = """
 # podcast feed urls
@@ -27,6 +29,7 @@ NERD_CONFIG_INITIAL_CONTENT = """
 global_config = Config.environment_instance()
 
 app = typer.Typer()
+
 
 @app.command("create")
 def create_nerd(nerd_name: str):
@@ -45,14 +48,21 @@ def create_nerd(nerd_name: str):
     Path(nerd_path, "source_documents").mkdir(parents=True, exist_ok=True)
 
     # nerd sources files
-    with open(Path(nerd_path, Config._YOUTUBE_SOURCES_FILENAME), "w", encoding="utf-8") as file:
+    with open(
+        Path(nerd_path, Config._YOUTUBE_SOURCES_FILENAME), "w", encoding="utf-8"
+    ) as file:
         file.write(YOUTUBE_SOURCES_INITIAL_CONTENT)
-    with open(Path(nerd_path, Config._PODCAST_SOURCES_FILENAME), "w", encoding="utf-8") as file:
+    with open(
+        Path(nerd_path, Config._PODCAST_SOURCES_FILENAME), "w", encoding="utf-8"
+    ) as file:
         file.write(PODCAST_SOURCES_INITIAL_CONTENT)
-    with open(Path(nerd_path, Config._NERD_CONFIG_FILENAME), "w", encoding="utf-8") as file:
+    with open(
+        Path(nerd_path, Config._NERD_CONFIG_FILENAME), "w", encoding="utf-8"
+    ) as file:
         file.write(NERD_CONFIG_INITIAL_CONTENT)
 
     logging.info(f"Nerd '{nerd_name}' created")
+
 
 @app.command("delete")
 def delete_nerd(nerd_name: str):
@@ -63,6 +73,7 @@ def delete_nerd(nerd_name: str):
         return
     shutil.rmtree(nerd_path)
     logging.info(f"Nerd '{nerd_name}' deleted")
+
 
 @app.command("rename")
 def rename_nerd(nerd_name: str, new_nerd_name: str):
@@ -82,6 +93,7 @@ def rename_nerd(nerd_name: str, new_nerd_name: str):
 
     logging.info(f"Nerd '{nerd_name}' renamed to '{new_nerd_name}'")
 
+
 @app.command("activate")
 def activate_nerd(nerd_name: str):
     logging.debug(f"Activating nerd '{nerd_name}'")
@@ -89,16 +101,18 @@ def activate_nerd(nerd_name: str):
     if not nerd_path.exists():
         logging.error(f"Nerd '{nerd_name}' does not exist")
         return
-    
+
     global_config.activate_nerd(nerd_name)
     logging.info(f"Nerd '{nerd_name}' activated")
+
 
 @app.command("list")
 def list_nerds():
     logging.debug("Listing nerds")
     nerds = os.listdir(global_config.NERDS_DIRECTORY_PATH)
     for nerd in nerds:
-        print(f"[ ] {nerd}") if nerd != global_config.get_active_nerd() else print(f"[x] {nerd}")
-
-
-
+        (
+            print(f"[ ] {nerd}")
+            if nerd != global_config.get_active_nerd()
+            else print(f"[x] {nerd}")
+        )

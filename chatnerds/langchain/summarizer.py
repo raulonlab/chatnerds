@@ -1,13 +1,12 @@
 from typing import Any, Dict, List
-import logging
-from langchain.docstore.document import Document
+from langchain_core.documents import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.prompts import PromptTemplate
 from langchain.llms.base import LLM as LLMBase
 from langchain.chains.summarize import load_summarize_chain
 from langchain.chains.combine_documents.base import BaseCombineDocumentsChain
 
-from .llm_factory import LLMFactory
+from chatnerds.langchain import LLMFactory
 
 
 class Summarizer:
@@ -18,39 +17,41 @@ class Summarizer:
     def __init__(self, config: Dict[str, Any]):
         self.config = config
         self.llm = LLMFactory(config).get_llm()
-        if (self.config.get("summarize_chain_type") == "map_reduce"):
+        if self.config.get("summarize_chain_type") == "map_reduce":
             self.chain = self._get_mapreduce_summarize_chain(self.llm)
-        elif (self.config.get("summarize_chain_type") == "refine"):
+        elif self.config.get("summarize_chain_type") == "refine":
             self.chain = self._get_refine_summarize_chain(self.llm)
         else:
             self.chain = self._get_stuff_summarize_chain(self.llm)
-    
 
     def summarize_documents(self, docs: List[Document], split: bool = False) -> str:
-        if (split):
-            text_splitter = RecursiveCharacterTextSplitter()    # separators=["\n\n", "\n", ".", " "], chunk_size=1800, chunk_overlap=200
+        if split:
+            text_splitter = (
+                RecursiveCharacterTextSplitter()
+            )  # separators=["\n\n", "\n", ".", " "], chunk_size=1800, chunk_overlap=200
             docs = text_splitter.split_documents(docs)
-        
-        summary = self.chain.run(docs)
-        # print("summary:\n", summary)
-        
-        return summary
 
+        summary = self.chain.invoke(docs)
+        # print("summary:\n", summary)
+
+        return summary
 
     def summarize_text(self, text: str) -> str:
         return self.summarize_documents(docs=[Document(page_content=text)], split=True)
-
 
     @staticmethod
     def _get_mapreduce_summarize_chain(llm: LLMBase) -> str:
         intro = "The following is a set of documents"
 
-        map_template = intro + """
+        map_template = (
+            intro
+            + """
 
         {text}
 
         Based on this list of docs, please write a concise summary. 
         Helpful Answer:"""
+        )
 
         combine_template = """The following is a set of summaries:
 
@@ -66,14 +67,13 @@ class Summarizer:
         # Get your chain ready to use
         chain = load_summarize_chain(
             llm=llm,
-            chain_type='map_reduce',
+            chain_type="map_reduce",
             map_prompt=map_prompt,
             combine_prompt=combine_prompt,
-            verbose=False
-            ) # verbose=True optional to see what is getting sent to the LLM
-        
-        return chain
+            verbose=False,
+        )  # verbose=True optional to see what is getting sent to the LLM
 
+        return chain
 
     @staticmethod
     def _get_refine_summarize_chain(llm: LLMBase) -> str:
@@ -103,14 +103,13 @@ class Summarizer:
         # Get your chain ready to use
         chain = load_summarize_chain(
             llm=llm,
-            chain_type='refine',
+            chain_type="refine",
             question_prompt=initial_prompt,
             refine_prompt=refine_prompt,
-            verbose=False
-            ) # verbose=True optional to see what is getting sent to the LLM
-        
-        return chain
+            verbose=False,
+        )  # verbose=True optional to see what is getting sent to the LLM
 
+        return chain
 
     @staticmethod
     def _get_stuff_summarize_chain(llm: LLMBase) -> str:
@@ -126,11 +125,7 @@ class Summarizer:
 
         # Get your chain ready to use
         chain = load_summarize_chain(
-            llm=llm,
-            chain_type='stuff',
-            prompt=prompt,
-            verbose=False
-            ) # verbose=True optional to see what is getting sent to the LLM
-        
-        return chain
+            llm=llm, chain_type="stuff", prompt=prompt, verbose=False
+        )  # verbose=True optional to see what is getting sent to the LLM
 
+        return chain

@@ -10,7 +10,7 @@ authors = ["Raul On Lab <raulonlab@gmail.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.10"
+python = ">=3.10,<3.12"
 langchain = "==0.1.5"
 langchain-community = "==0.0.17"
 llama-cpp-python = ">=0.2.38"
@@ -36,6 +36,10 @@ pyyaml = ">=6.0"
 pytubefix = "^1.13"
 feedparser = "==6.0.10"
 music-tag = "*"
+pdfminer-six = "^20231228"
+unstructured = "^0.12.4"
+langchain-openai = "^0.0.6"
+simsimd = ">=3.7.7,<3.8"
 
 [tool.poetry.group.dev.dependencies]
 deptry = "*"
@@ -43,10 +47,11 @@ pylint = "*"
 autoflake = "*"
 black = "*"
 pre-commit = "^3.6.0"
+mkinit = "^1.1.0"
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
-chatnerds = "chatnerds.cli:app"
+chatnerds = "chatnerds.__main__:run_cli"

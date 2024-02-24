@@ -34,6 +34,11 @@ poetry-black:
 poetry-lint:
 	@poetry run pylint ./chatnerds
 
+### autogenerate imports in __init__.py files. --noattrs --nomods --relative --recursive
+poetry-mkinit:
+	@poetry run mkinit chatnerds --nomods --recursive -w
+	# @poetry run mkinit chatnerds --noattrs -w
+
 ### Detect and show dependencies
 poetry-deptry:
 	@poetry run deptry .

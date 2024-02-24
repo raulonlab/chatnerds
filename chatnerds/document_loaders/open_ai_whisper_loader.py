@@ -1,8 +1,9 @@
 """Loads audio file transcription."""
+
 import os
 from typing import Iterator, List, Optional
 
-from langchain.docstore.document import Document
+from langchain_core.documents import Document
 from langchain.document_loaders.base import BaseLoader
 from langchain.document_loaders.blob_loaders.file_system import FileSystemBlobLoader
 from langchain.document_loaders.generic import GenericLoader
@@ -14,14 +15,18 @@ class OpenAIWhisperLoader(BaseLoader):
     """Loads audio file transcription using OpenAI Whisper.
     OpenAIWhisperParserLocal Source: langchain/document_loaders/parsers/audio.py"""
 
-    def __init__(self, file_path: str, device: Optional[str] = "cpu", lang_model: Optional[str] = "openai/whisper-base"):
+    def __init__(
+        self,
+        file_path: str,
+        device: Optional[str] = "cpu",
+        lang_model: Optional[str] = "openai/whisper-base",
+    ):
         """Initialize with file path."""
         self.file_path = file_path
         self.device = device
         self.lang_model = lang_model
         if "~" in self.file_path:
             self.file_path = os.path.expanduser(self.file_path)
-        
 
     def _get_loader(self) -> GenericLoader:
         return GenericLoader(
