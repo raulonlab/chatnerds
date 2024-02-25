@@ -1,4 +1,4 @@
-__private__ = ["cli", "cli_common", "cli_nerd", "cli_test"]
+__private__ = ["cli", "cli_utils", "cli_nerds", "cli_sources", "cli_tools"]
 
 # <AUTOGEN_INIT>
 __all__ = []

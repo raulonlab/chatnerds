@@ -5,22 +5,25 @@ from rich.panel import Panel
 from datetime import datetime
 from langchain_core.tracers.stdout import ConsoleCallbackHandler
 from chatnerds.langchain.chain_factory import ChainFactory
+from chatnerds.config import Config
 
-QA_LOG_PATH = "./chatnerds_qa.log"
+_global_config = Config.environment_instance()
+
+_QA_LOG_PATH = "./chatnerds_qa.log"
 
 
-def write_qa_log(text: str) -> None:
-    with open(QA_LOG_PATH, "a", encoding="utf-8") as file:
+def _write_qa_log(text: str) -> None:
+    with open(_QA_LOG_PATH, "a", encoding="utf-8") as file:
         file.write(text)
 
 
-def handle_answer(text: str) -> None:
+def _handle_answer(text: str) -> None:
     escaped_text = escape(text)
     print(f"[bright_cyan]{escaped_text}", end="", flush=True)
-    write_qa_log(escaped_text)
+    _write_qa_log(escaped_text)
 
 
-def get_log_header(config: Dict[str, Any]) -> str:
+def _get_log_header(config: Dict[str, Any]) -> str:
     now_string = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
     log = "\n\n----------------------------------\n"
     log += f"Created at:      {now_string}\n"
@@ -30,8 +33,10 @@ def get_log_header(config: Dict[str, Any]) -> str:
     return log
 
 
-def chat(config: Dict[str, Any], query: Optional[str] = None) -> None:
-    # qa = get_retrieval_qa(config, callback=handle_answer)
+def chat(query: Optional[str] = None) -> None:
+    config = _global_config.get_nerd_config()
+
+    # qa = get_retrieval_qa(config, callback=_handle_answer)
     # chat_chain = ChainFactory(config).get_rag_chain()
     chat_chain = ChainFactory(config).get_rag_fusion_chain()
     # chat_chain = ChainFactory(config).get_prompt_test_chain()
@@ -56,7 +61,7 @@ def chat(config: Dict[str, Any], query: Optional[str] = None) -> None:
 
         # raul: save Q & A to log file
         log_query = f"Q:\n{escape(query)}\nA:\n"
-        write_qa_log(f"{get_log_header(config)}{log_query}")
+        _write_qa_log(f"{_get_log_header(config)}{log_query}")
 
         # res = chat_chain.invoke({ "question": query },
         #          config={'callbacks': [ConsoleCallbackHandler()]})
@@ -64,7 +69,7 @@ def chat(config: Dict[str, Any], query: Optional[str] = None) -> None:
         res = chat_chain.invoke(query, config={"callbacks": [ConsoleCallbackHandler()]})
 
         if isinstance(res, Dict) and "result" in res:
-            handle_answer(res["result"])
+            _handle_answer(res["result"])
 
             print()
             if "source_documents" in res:
@@ -78,11 +83,11 @@ def chat(config: Dict[str, Any], query: Optional[str] = None) -> None:
                         )
                     )
 
-                write_qa_log(log_sources)
+                _write_qa_log(log_sources)
                 print()
         else:
-            # handle_answer("No response result found!")
-            handle_answer(res)
+            # _handle_answer("No response result found!")
+            _handle_answer(res)
 
         if not interactive:
             break

@@ -1,123 +1,44 @@
 import os
-from pathlib import Path
 from typing import Optional
 from typing_extensions import Annotated
 import typer
 import logging
-from rich import print
-from rich.markup import escape
-from rich.panel import Panel
 from chatnerds.config import Config
 from chatnerds.logging_setup import setup as setup_logging
-from chatnerds.cli import cli_common, cli_nerd, cli_test
-from chatnerds import utils
-from chatnerds.tools.audio_transcriber import AudioTranscriber
-from chatnerds.tools.podcast_downloader import PodcastDownloader
-from chatnerds.tools.youtube_downloader import YoutubeDownloader
-from chatnerds.chat import chat
+from chatnerds.cli import cli_nerds, cli_sources, cli_tools, cli_utils
+from chatnerds import LogColors
+from chatnerds import chat, study
 from chatnerds.langchain.document_embeddings import DocumentEmbeddings
 from chatnerds.langchain.chroma_database import ChromaDatabase
 
 # load config
-global_config = Config.environment_instance()
+_global_config = Config.environment_instance()
 
-log_terminal_level = logging.DEBUG
-if global_config.VERBOSE == 0:
-    log_terminal_level = logging.WARNING
-elif global_config.VERBOSE == 1:
-    log_terminal_level = logging.INFO
+_log_terminal_level = logging.DEBUG
+if _global_config.VERBOSE == 0:
+    _log_terminal_level = logging.WARNING
+elif _global_config.VERBOSE == 1:
+    _log_terminal_level = logging.INFO
 
 setup_logging(
-    log_terminal_level=log_terminal_level,
-    log_file_level=global_config.LOG_FILE_LEVEL,
-    log_file_path=global_config.LOG_FILE_PATH,
+    log_terminal_level=_log_terminal_level,
+    log_file_level=_global_config.LOG_FILE_LEVEL,
+    log_file_path=_global_config.LOG_FILE_PATH,
 )
 
-app = typer.Typer()
+app = typer.Typer(cls=cli_utils.OrderCommands)
 
 # Import commands from other modules
-app.add_typer(cli_nerd.app, name="nerd")
-app.add_typer(cli_test.app, name="test")
+# app.add_typer(cli_nerds.app, name="nerd")
+# app.add_typer(cli_sources.app, name="sources")
+app.registered_commands += cli_nerds.app.registered_commands
+app.registered_commands += cli_sources.app.registered_commands
 
 
-# validate and prompt to confirm the active nerd
-def validate_confirm_active_nerd(skip_confirmation: bool = True):
-    if not global_config.get_active_nerd():
-        typer.echo(
-            "No active nerd set. Please set an active nerd first. See chatnerds nerd --help. "
-        )
-        raise typer.Abort()
-
-    active_nerd = global_config.get_active_nerd()
-
-    if skip_confirmation:
-        typer.echo(
-            f"Using nerd {utils.LogColors.BOLDNERD}{active_nerd}{utils.LogColors.ENDC}..."
-        )
-    else:
-        prompt_response = cli_common.prompt_active_nerd(
-            active_nerd=active_nerd,
-            nerd_base_path=global_config.get_nerd_base_path(),
-        )
-        if not prompt_response:
-            raise typer.Abort()
-
-
-@app.command(
-    "download", help="Download audio files from sources (youtube and podcasts)"
-)
-def download_command(source: cli_common.SourceOption = None):
-    validate_confirm_active_nerd()
-
-    # Youtube downloader
-    if not source or source == cli_common.SourceEnum.youtube:
-        youtube_downloader = YoutubeDownloader(
-            source_urls=global_config.get_nerd_youtube_sources(), config=global_config
-        )
-        youtube_downloader.run(
-            output_path=str(
-                Path(global_config.get_nerd_base_path(), "downloads", "youtube")
-            )
-        )
-
-    # Padcasts downloader
-    if not source or source == cli_common.SourceEnum.podcasts:
-        podcast_downloader = PodcastDownloader(
-            feeds=global_config.get_nerd_podcast_sources(), config=global_config
-        )
-        podcast_downloader.run(
-            output_path=str(
-                Path(global_config.get_nerd_base_path(), "downloads", "podcasts")
-            )
-        )
-
-
-@app.command("transcribe", help="Transcribe audio files")
-def transcribe_command(
-    directory_filter: cli_common.DirectoryFilterArgument = None,
-    source: cli_common.SourceOption = None,
-):
-    validate_confirm_active_nerd()
-
-    source_directories = cli_common.get_source_directory_paths(
-        directory_filter=directory_filter,
-        source=source,
-        base_path=global_config.get_nerd_base_path(),
-    )
-
-    # Audio transcriber
-    for source_directory in source_directories:
-        audio_transcriber = AudioTranscriber(
-            source_directory=str(source_directory), config=global_config
-        )
-        logging.info(f"Transcribing directory: {source_directory}")
-        audio_transcriber.run()
-
-
-@app.command("add", help="Add source documents to embeddings DB")
-def add_command(
-    directory_filter: cli_common.DirectoryFilterArgument = None,
-    source: cli_common.SourceOption = None,
+@app.command("study", help="Add source documents to embeddings DB")
+def study_command(
+    directory_filter: cli_utils.DirectoryFilterArgument = None,
+    source: cli_utils.SourceOption = None,
 ):
     if not directory_filter and not source:
         typer.echo(
@@ -125,22 +46,13 @@ def add_command(
         )
         raise typer.Abort()
 
-    validate_confirm_active_nerd()
+    cli_utils.validate_confirm_active_nerd()
 
-    source_directories = cli_common.get_source_directory_paths(
-        directory_filter=directory_filter,
-        source=source,
-        base_path=global_config.get_nerd_base_path(),
-    )
-
-    nerd_config = global_config.get_nerd_config()
     try:
-        DocumentEmbeddings(config=nerd_config).embed_directories(
-            source_directories=source_directories
-        )
+        study(directory_filter=directory_filter, source=source)
     except Exception as e:
         logging.error(
-            f"Error adding source directories: {source_directories}. Try to load the sources separately with the option --source. See chatnerds add --help."
+            f"Error studying sources. Try to load the sources separately with the option --source. See chatnerds add --help."
         )
         logging.error(e)
     except SystemExit:
@@ -158,54 +70,16 @@ def chat_command(
         ),
     ] = None,
 ):
-    validate_confirm_active_nerd()
+    cli_utils.validate_confirm_active_nerd()
 
-    nerd_config = global_config.get_nerd_config()
-    chat(config=nerd_config, query=query)
-
-
-@app.command("youtube", help="Transcribe youtube video")
-def youtube_command(
-    url: cli_common.UrlFilterArgument = None,
-):
-    youtube_downloader = YoutubeDownloader(source_urls=[url], config=global_config)
-    audio_output_file_paths = youtube_downloader.run()
-
-    if len(audio_output_file_paths) == 0:
-        typer.echo(f"Unable to download audio from url: {url}")
-        raise typer.Abort()
-
-    audio_output_file_path = audio_output_file_paths[0]
-    source_directory = Path(audio_output_file_path).parent
-    audio_transcriber = AudioTranscriber(
-        source_directory=str(source_directory), config=global_config
-    )
-    logging.info(f"Transcribing directory: {source_directory}")
-    transcript_output_file_paths = audio_transcriber.run()
-
-    if len(transcript_output_file_paths) == 0:
-        typer.echo(f"Unable to transcript audio file: {audio_output_file_path}")
-        raise typer.Abort()
-
-    transcript_output_file_path = transcript_output_file_paths[0]
-    with open(transcript_output_file_path, "r") as transcript_file:
-        transcript = transcript_file.read()
-        print(f"Transcript of youtube video {url}:\n\n{transcript}")
-
-
-@app.command("podcast", help="Transcribe podcast")
-def podcast_command(
-    url: cli_common.UrlFilterArgument = None,
-):
-    podcast_downloader = PodcastDownloader(feeds=[url], config=global_config)
-    podcast_downloader.run()
+    chat(query=query)
 
 
 @app.command("db", help="Print summary of the embeddings DB")
 def db_command():
-    validate_confirm_active_nerd(skip_confirmation=True)
+    cli_utils.validate_confirm_active_nerd(skip_confirmation=True)
 
-    nerd_config = global_config.get_nerd_config()
+    nerd_config = _global_config.get_nerd_config()
 
     embeddings = DocumentEmbeddings(config=nerd_config).get_embedding_function()
 
@@ -223,7 +97,7 @@ def db_command():
     # Print summary
     print("Chroma DB information:")
     print(
-        f"DB Path:       {utils.LogColors.BOLD}{nerd_config['chroma']['persist_directory']}{utils.LogColors.ENDC}"
+        f"DB Path:       {LogColors.BOLD}{nerd_config['chroma']['persist_directory']}{LogColors.ENDC}"
     )
     print(f"Documents ({len(distinct_documents)}):")
     for document in distinct_documents:
@@ -233,77 +107,15 @@ def db_command():
                 print(f"      - {key}: {value}")
 
 
-@app.command(
-    "search", help="Search similar documents from a query in the embeddings DB"
-)
-def search_command(
-    query: Annotated[
-        Optional[str],
-        typer.Argument(
-            help="The query to use for search. If not specified, runs in interactive mode."
-        ),
-    ] = None,
-):
-    validate_confirm_active_nerd(skip_confirmation=True)
-
-    interactive = not query
-    print()
-    if interactive:
-        print("Type your query below and press Enter.")
-        print("Type 'exit' or 'quit' or 'q' to exit the application.\n")
-
-    print("[bold]Q: ", end="", flush=True)
-    if interactive:
-        query = input()
-    else:
-        print(escape(query))
-    print()
-    if query.strip() in ["exit", "quit", "q"]:
-        print("Exiting...\n")
-        return
-
-    print("Searching...\n", end="", flush=True)
-
-    nerd_config = global_config.get_nerd_config()
-
-    embeddings = DocumentEmbeddings(config=nerd_config).get_embedding_function()
-
-    database = ChromaDatabase(embeddings=embeddings, config=nerd_config["chroma"])
-
-    similar_chunks = database.find_similar_docs(query="hello", k=5)
-
-    # Get distinct sources documents
-    distinct_similar_sources = []
-    for doc in similar_chunks:
-        if doc.metadata["source"] not in distinct_similar_sources:
-            distinct_similar_sources.append(doc.metadata["source"])
-
-    print(
-        f"\n[bold]Similar documents found: ({len(distinct_similar_sources)})",
-        end="",
-        flush=True,
-    )
-    for source in distinct_similar_sources:
-        print(f"\n[bright_blue]Source: [bold]{escape(source)}\n", end="", flush=True)
-        metadata = {}
-        merged_page_contents = ""
-        for doc in similar_chunks:
-            if doc.metadata["source"] == source:
-                metadata = doc.metadata
-                if merged_page_contents == "":
-                    merged_page_contents = doc.page_content
-                else:
-                    merged_page_contents = (
-                        merged_page_contents + "\n\n(...)\n\n" + doc.page_content
-                    )
-
-        print(
-            Panel(
-                f"URL: {escape(metadata.get('comment', '-'))}\n\n{escape(merged_page_contents)}"
-            )
-        )
-
-
 @app.command("config", help="Print runtime configuration")
 def config_command():
-    print(str(global_config))
+    print(str(_global_config))
+
+
+app.add_typer(
+    cli_tools.app,
+    name="tools",
+    help="Other tools",
+    short_help="Other tools",
+    epilog="* These tools work independently of your active nerd environment.",
+)
