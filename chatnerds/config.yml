@@ -1,6 +1,6 @@
 system_prompt: Use the following pieces of context to answer the question at the end. If you don't know the answer, just say that you don't know, don't try to make up an answer.
 use_history: false
-device_type: mps    # (default: cpu) Select device type: cuda, mps, cpu
+device_type: cpu    # (default: cpu) Select device type: cuda, mps, cpu
 summarize_chain_type: "stuff"  # (default: stuff) Select summarization chain type: stuff, map_reduce, refine
 
 embeddings:
@@ -8,7 +8,7 @@ embeddings:
   # model_kwargs:
   #   device: mps
 
-llm: ollama2
+llm: speechless_wizard_gguf
 
 gpt-3.5-turbo:
   provider: openai
@@ -18,7 +18,7 @@ gpt-3.5-turbo:
   # max_tokens: 4096
   # verbose: False
 
-ollama1:
+ollama-llama2:
   provider: ollama
   model: llama2-uncensored:7b-chat-q4_K_M
   temperature: 0.2  # Default: 0.8
@@ -26,7 +26,7 @@ ollama1:
   num_ctx: 16000  # 8192  # Default: 2048
   # verbose: False
 
-ollama2:
+ollama-mistral-instruct:
   provider: ollama
   model: mistral:instruct
   temperature: 0.2  # Default: 0.8
@@ -134,18 +134,13 @@ chroma:
   anonymized_telemetry: false
 
 retriever:
-  search_type: mmr  # Defines the type of search that the Retriever should perform: "similarity" (default), "mmr", or "similarity_score_threshold".
+  search_type: similarity  # Defines the type of search that the Retriever should perform: "similarity" (default), "mmr", or "similarity_score_threshold".
   search_kwargs:
     k: 6  # Amount of documents to return (Default: 4)
     # score_threshold: 0.85  # Minimum relevance threshold for similarity_score_threshold
-    fetch_k: 500  # Amount of documents to pass to MMR algorithm (Default: 20)
-    lambda_mult: 0.2  # Diversity of results returned by MMR; 1 for minimum diversity and 0 for maximum. (Default: 0.5)
+    # fetch_k: 500  # Amount of documents to pass to MMR algorithm (Default: 20)
+    # lambda_mult: 0.2  # Diversity of results returned by MMR; 1 for minimum diversity and 0 for maximum. (Default: 0.5)
     # filter: Filter by document metadata. Ex: {'paper_title':'GPT-4 Technical Report'}}
 
 chain:
   n_expanded_queries: 3  # Number of similar queries to expand the original query with. Set 0 to disable query expansion. (Default: 3)
-  # query_expansion_llm: ollama1  # LLM to use for query expansion. If none, it will use the general one set in llm (Default: None)
-  # query_expansion_prompt: >
-  #   You are a helpful assistant, you will use the provided context to answer user questions.
-  #   Read the given context before answering questions and think step by step. If you can not answer a user question based on 
-  #   the provid
