@@ -1,4 +1,5 @@
 import os
+import re
 import shutil
 from pathlib import Path
 import logging
@@ -32,10 +33,16 @@ app = typer.Typer()
 
 
 @app.command(
-    "create", help="Create a new nerd. A nerd is a collection of sources and documents"
+    "init", help="Initialize a new nerd. A nerd is a collection of sources and documents"
 )
-def create_nerd(nerd_name: str):
-    logging.debug(f"Creating nerd '{nerd_name}'")
+def init_nerd(nerd_name: str):
+    if not validate_nerd_name(nerd_name):
+        logging.error(
+            f"Invalid nerd name '{nerd_name}'. Nerd name must start with alphanumeric and underscore characters"
+        )
+        return
+    
+    logging.debug(f"Initializing nerd '{nerd_name}'")
     nerd_path = Path(_global_config.NERDS_DIRECTORY_PATH, nerd_name)
     if nerd_path.exists():
         logging.error(f"Nerd '{nerd_name}' already exists")
@@ -65,6 +72,10 @@ def create_nerd(nerd_name: str):
 
     logging.info(f"Nerd '{nerd_name}' created")
 
+    # Activate nerd if no active nerd
+    if not _global_config.get_active_nerd():
+        activate_nerd(nerd_name)
+
 
 @app.command("remove", help="Remove an existing nerd")
 def remove_nerd(nerd_name: str):
@@ -76,9 +87,19 @@ def remove_nerd(nerd_name: str):
     shutil.rmtree(nerd_path)
     logging.info(f"Nerd '{nerd_name}' deleted")
 
+    if _global_config.get_active_nerd() == nerd_name:
+        _global_config.activate_nerd("")  # deactivate nerd
+        logging.info("Nerd deactivated")
+
 
 @app.command("rename", help="Rename an existing nerd")
 def rename_nerd(nerd_name: str, new_nerd_name: str):
+    if not validate_nerd_name(new_nerd_name):
+        logging.error(
+            f"Invalid nerd name '{new_nerd_name}'. Nerd name must start with alphanumeric and underscore characters"
+        )
+        return
+
     logging.debug(f"Renaming nerd '{nerd_name}' to '{new_nerd_name}'")
     nerd_path = Path(_global_config.NERDS_DIRECTORY_PATH, nerd_name)
     if not nerd_path.exists():
@@ -90,6 +111,7 @@ def rename_nerd(nerd_name: str, new_nerd_name: str):
         return
     nerd_path.rename(new_nerd_path)
 
+    # Update active nerd name if necessary
     if _global_config.get_active_nerd() == nerd_name:
         _global_config.activate_nerd(new_nerd_name)
 
@@ -116,8 +138,11 @@ def list_nerds():
     logging.debug("Listing nerds")
     nerds = os.listdir(_global_config.NERDS_DIRECTORY_PATH)
     for nerd in nerds:
-        (
-            print(f"[ ] {nerd}")
-            if nerd != _global_config.get_active_nerd()
-            else print(f"[x] {nerd}")
-        )
+        if not validate_nerd_name(nerd):
+            continue
+
+        print(f"[ ] {nerd}") if nerd != _global_config.get_active_nerd() else print(f"[x] {nerd}")
+
+
+def validate_nerd_name(nerd_name: str):
+    return bool(re.match(r"\w", nerd_name))

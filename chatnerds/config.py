@@ -240,9 +240,9 @@ class Config(object):
                     podcast_feeds.append(line)
         return podcast_feeds
 
-    def activate_nerd(self, nerd_name: str):
+    def activate_nerd(self, nerd_name: str | None = None):
         # validate nerd path exists
-        if not self.get_nerd_base_path(nerd_name=nerd_name).exists():
+        if nerd_name and not self.get_nerd_base_path(nerd_name=nerd_name).exists():
             raise ValueError(
                 f"Nerd '{nerd_name}' does not exist. Create it first. See chatnerds nerd --help."
             )
@@ -254,13 +254,12 @@ class Config(object):
         # write to disk runtime .env file
         self.dump_runtime_dotenv()
 
-    def get_active_nerd(self) -> str:
+    def get_active_nerd(self) -> str | None:
         return self.ACTIVE_NERD
 
     def dump_runtime_dotenv(self):
         with open(_RUNTIME_DOTENV_PATH, "w") as file_handler:
-            if self.ACTIVE_NERD:
-                file_handler.write("%s=%s\n" % ("ACTIVE_NERD", self.ACTIVE_NERD))
+            file_handler.write("%s=%s\n" % ("ACTIVE_NERD", self.ACTIVE_NERD or ""))
 
     @classmethod
     def read_nerd_config(cls, path: Union[Path, str]) -> Dict[str, Any]:
