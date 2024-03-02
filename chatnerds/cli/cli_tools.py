@@ -6,25 +6,20 @@ from typing_extensions import Annotated
 from rich import print as rprint
 from rich.markup import escape
 from rich.panel import Panel
-from chatnerds.cli import cli_utils
-from chatnerds.langchain.document_embeddings import DocumentEmbeddings
-from chatnerds.langchain.chroma_database import ChromaDatabase
-from chatnerds.document_loaders.transcript_loader import TranscriptLoader
-from chatnerds.langchain.document_embeddings import DocumentEmbeddings
-from chatnerds.tools.audio_transcriber import AudioTranscriber
-from chatnerds.tools.youtube_downloader import YoutubeDownloader
-from chatnerds.langchain.summarizer import Summarizer
+from chatnerds.cli.cli_utils import UrlFilterArgument, validate_confirm_active_nerd
 from chatnerds.config import Config
 
-_global_config = Config.environment_instance()
 
+_global_config = Config.environment_instance()
 app = typer.Typer()
 
 
 @app.command("transcribe-youtube", help="Transcribe youtube video")
 def transcribe_youtube_command(
-    url: cli_utils.UrlFilterArgument = None,
+    url: UrlFilterArgument = None,
 ):
+    from chatnerds.tools.youtube_downloader import YoutubeDownloader
+
     youtube_downloader = YoutubeDownloader(source_urls=[url], config=_global_config)
     audio_output_file_paths = youtube_downloader.run()
 
@@ -34,6 +29,9 @@ def transcribe_youtube_command(
 
     audio_output_file_path = audio_output_file_paths[0]
     source_directory = Path(audio_output_file_path).parent
+
+    from chatnerds.tools.audio_transcriber import AudioTranscriber
+
     audio_transcriber = AudioTranscriber(
         source_directory=str(source_directory), config=_global_config
     )
@@ -53,8 +51,17 @@ def transcribe_youtube_command(
 @app.command("split")
 def split_command(input_file_path: str):
     nerd_config = _global_config.get_nerd_config()
+
+    from chatnerds.document_loaders.transcript_loader import TranscriptLoader
+
     try:
         transcript_documents = TranscriptLoader(input_file_path).load()
+        print("transcript_documents: ")
+        print(transcript_documents)
+        print("#########################\n")
+
+        from chatnerds.langchain.document_embeddings import DocumentEmbeddings
+
         chunks = DocumentEmbeddings(config=nerd_config).split_documents(
             transcript_documents
         )
@@ -75,8 +82,13 @@ def split_command(input_file_path: str):
 @app.command("summarize")
 def summarize_command(input_file_path: str):
     nerd_config = _global_config.get_nerd_config()
+
+    from chatnerds.document_loaders.transcript_loader import TranscriptLoader
+
     try:
         transcript_documents = TranscriptLoader(input_file_path).load()
+
+        from chatnerds.langchain.summarizer import Summarizer
 
         summarizer = Summarizer(nerd_config)
         summary = summarizer.summarize_text(transcript_documents[0].page_content)
@@ -103,7 +115,7 @@ def search_command(
         ),
     ] = None,
 ):
-    cli_utils.validate_confirm_active_nerd(skip_confirmation=True)
+    validate_confirm_active_nerd(skip_confirmation=True)
 
     interactive = not query
     print()
@@ -125,29 +137,53 @@ def search_command(
 
     nerd_config = _global_config.get_nerd_config()
 
+    from chatnerds.langchain.document_embeddings import DocumentEmbeddings
+
     embeddings = DocumentEmbeddings(config=nerd_config).get_embedding_function()
+
+    from chatnerds.langchain.chroma_database import ChromaDatabase
 
     database = ChromaDatabase(embeddings=embeddings, config=nerd_config["chroma"])
 
-    similar_chunks = database.find_similar_docs(query="hello", k=5)
+    similar_chunks = database.find_similar_docs(
+        query=query,
+        k=nerd_config["retriever"]["search_kwargs"].get("k", 4),
+        with_score=True,
+    )
 
-    # Get distinct sources documents
-    distinct_similar_sources = []
-    for doc in similar_chunks:
-        if doc.metadata["source"] not in distinct_similar_sources:
-            distinct_similar_sources.append(doc.metadata["source"])
+    # Add score to metadata
+    rprint("\n[bold]Similar documents found:", end="", flush=True)
+    for doc, score in similar_chunks:
+        doc.metadata["score"] = score
+        rprint(
+            f"\n[bright_blue]Score: [bold]{score}\n\n{escape(doc.page_content)}",
+            end="",
+            flush=True,
+        )
+
+    # Remove duplicates
+    unique_ids = set()
+    unique_similar_documents = [
+        doc
+        for doc, score in similar_chunks
+        if doc.page_content not in unique_ids and (unique_ids.add(doc) or True)
+    ]
 
     rprint(
-        f"\n[bold]Similar documents found: ({len(distinct_similar_sources)})",
+        f"\n[bold]Similar documents found: ({len(unique_similar_documents)})",
         end="",
         flush=True,
     )
-    for source in distinct_similar_sources:
-        rprint(f"\n[bright_blue]Source: [bold]{escape(source)}\n", end="", flush=True)
+    for source in unique_similar_documents:
+        rprint(
+            f"\n[bright_blue]Source: [bold]{escape(source.metadata['source'])} [bright_green](score: {str(source.metadata['score'])})\n",
+            end="",
+            flush=True,
+        )
         metadata = {}
         merged_page_contents = ""
-        for doc in similar_chunks:
-            if doc.metadata["source"] == source:
+        for doc in unique_similar_documents:
+            if doc.metadata["source"] == source.metadata["source"]:
                 metadata = doc.metadata
                 if merged_page_contents == "":
                     merged_page_contents = doc.page_content
@@ -156,8 +192,26 @@ def search_command(
                         merged_page_contents + "\n\n(...)\n\n" + doc.page_content
                     )
 
-        print(
+        rprint(
             Panel(
                 f"URL: {escape(metadata.get('comment', '-'))}\n\n{escape(merged_page_contents)}"
             )
         )
+
+
+@app.command("test", help="Test")
+def test_command():
+    validate_confirm_active_nerd(skip_confirmation=True)
+
+    nerd_config = _global_config.get_nerd_config()
+
+    from chatnerds.langchain.document_embeddings import DocumentEmbeddings
+
+    embeddings = DocumentEmbeddings(config=nerd_config).get_embedding_function()
+    print(f"Maximum embedded sequence length: {embeddings.client.get_max_seq_length()}")
+
+    from chatnerds.langchain.chroma_database import ChromaDatabase
+
+    database = ChromaDatabase(embeddings=embeddings, config=nerd_config["chroma"])
+
+    database.print_short_chunks()

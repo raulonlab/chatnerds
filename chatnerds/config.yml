@@ -1,6 +1,6 @@
 system_prompt: Use the following pieces of context to answer the question at the end. If you don't know the answer, just say that you don't know, don't try to make up an answer.
 use_history: false
-device_type: cpu    # (default: cpu) Select device type: cuda, mps, cpu
+device_type: mps    # (default: cpu) Select device type: cuda, mps, cpu
 summarize_chain_type: "stuff"  # (default: stuff) Select summarization chain type: stuff, map_reduce, refine
 
 embeddings:
@@ -8,7 +8,12 @@ embeddings:
   # model_kwargs:
   #   device: mps
 
-llm: speechless_wizard_gguf
+splitter:
+  chunk_size: 600  # (default: 1000) Maximum number of tokens per chunk.
+  chunk_overlap: 60  # (default: 100) Number of tokens to overlap between chunks.
+  # keep_separator: False  # (default: False) Keep the separator token at the end of each chunk.
+
+llm: ollama-mistral-instruct
 
 gpt-3.5-turbo:
   provider: openai
@@ -21,7 +26,7 @@ gpt-3.5-turbo:
 ollama-llama2:
   provider: ollama
   model: llama2-uncensored:7b-chat-q4_K_M
-  temperature: 0.2  # Default: 0.8
+  temperature: 0.5  # Default: 0.8
   # top_p: 0.5  # Default: 0.9
   num_ctx: 16000  # 8192  # Default: 2048
   # verbose: False
@@ -143,4 +148,5 @@ retriever:
     # filter: Filter by document metadata. Ex: {'paper_title':'GPT-4 Technical Report'}}
 
 chain:
-  n_expanded_queries: 3  # Number of similar queries to expand the original query with. Set 0 to disable query expansion. (Default: 3)
+  n_expanded_questions: 3  # Number of similar questions to expand the original query with. Set 0 to disable query expansion. (Default: 3)
+  use_cross_encoding_rerank: true  # Use cross-chain summarization. (Default: True)

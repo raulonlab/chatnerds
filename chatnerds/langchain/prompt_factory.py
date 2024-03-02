@@ -43,7 +43,7 @@ class PromptFactory:
 
         prompt = ChatPromptTemplate.from_messages(prompt_messages)
 
-        print(f"PromptFactory._get_rag_prompt_generic: prompt=\n{prompt.get_prompts()}")
+        # print(f"PromptFactory._get_rag_prompt_generic: prompt=\n{prompt.get_prompts()}")
 
         return prompt
 
@@ -89,7 +89,7 @@ class PromptFactory:
             input_variables=["context", "question"], template=prompt_template
         )
 
-        print(f"PromptFactory._get_rag_prompt_by_type: prompt=\n{prompt.get_prompts()}")
+        # print(f"PromptFactory._get_rag_prompt_by_type: prompt=\n{prompt.get_prompts()}")
 
         return prompt
 
@@ -98,10 +98,10 @@ class PromptFactory:
         llm: LLMBase,
         system_prompt=None,
         prompt_type=None,
-        n_expanded_queries: int = 0,
+        n_expanded_questions: int = 0,
     ):
         formatted_system_prompt = system_prompt.format(
-            n_expanded_queries=n_expanded_queries
+            n_expanded_questions=n_expanded_questions
         )
         prompt_selector = ConditionalPromptSelector(
             default_prompt=self._get_query_expansion_prompt_generic(

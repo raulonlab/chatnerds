@@ -18,6 +18,10 @@ poetry-version-tag:
 	@git tag v$$(poetry version -s)
 	@git push --tags
 
+### lint
+poetry-lint:
+	@poetry run pylint ./chatnerds
+
 ### autoflake detect (remove unused imports and variables)
 poetry-autoflake:
 	@poetry run autoflake --remove-unused-variables --remove-all-unused-imports --recursive --verbose ./chatnerds
@@ -26,18 +30,15 @@ poetry-autoflake:
 poetry-autoflake-fix:
 	@poetry run autoflake --in-place --remove-unused-variables --remove-all-unused-imports --recursive --verbose ./chatnerds
 
-### black
+### black (prettifier)
 poetry-black:
 	@poetry run black ./chatnerds
 
-### lint
-poetry-lint:
-	@poetry run pylint ./chatnerds
+poetry-fix: poetry-autoflake-fix poetry-black
 
-### autogenerate imports in __init__.py files. --noattrs --nomods --relative --recursive
-poetry-mkinit:
-	@poetry run mkinit chatnerds --nomods --recursive -w
-	# @poetry run mkinit chatnerds --noattrs -w
+poetry-importtime:
+	@poetry run python -X importtime ./chatnerds/cli/cli.py 2> importtime_cli.log
+	@poetry run tuna --sort-by cumtime --reverse importtime_cli.log
 
 ### Detect and show dependencies
 poetry-deptry:

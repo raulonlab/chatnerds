@@ -4,8 +4,9 @@ from typing_extensions import Annotated
 import typer
 from typer.core import TyperGroup
 from click import Context
-from chatnerds import SourceEnum, LogColors
+from chatnerds.enums import SourceEnum, LogColors
 from chatnerds.config import Config
+
 
 _global_config = Config.environment_instance()
 
@@ -20,12 +21,14 @@ SourceOption = Annotated[
     ),
 ]
 
+
 DirectoryFilterArgument = Annotated[
     Optional[Path],
     typer.Argument(
         help="The relative path of the directory to be processed. Optional."
     ),
 ]
+
 
 UrlFilterArgument = Annotated[
     str,
@@ -73,3 +76,17 @@ def prompt_active_nerd(active_nerd: str, nerd_base_path: Path):
         return typer.confirm(
             f"{prompt_text}... do you want to continue?", default=True, abort=False
         )
+
+
+def grep_match(pattern: str, *args):
+    """
+    Returns True if a pattern matches any of the args values (in a case-insensitive manner)
+    """
+    if not pattern:
+        return True
+
+    pattern = pattern.lower()
+    for arg in args:
+        if pattern in str(arg).lower():
+            return True
+    return False

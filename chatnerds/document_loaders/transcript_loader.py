@@ -1,6 +1,5 @@
 from typing import List
 from dotenv import dotenv_values
-
 from langchain_community.document_loaders.base import BaseLoader
 from langchain_core.documents import Document
 

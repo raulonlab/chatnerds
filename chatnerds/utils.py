@@ -1,7 +1,29 @@
 import os
+import time
 from pathlib import Path
 from typing import List
-from chatnerds import SourceEnum, SOURCE_PATHS
+from chatnerds.enums import SourceEnum, SOURCE_PATHS
+
+
+class TimeTaken:
+    """
+    Records the duration of a task in debug mode and prints it to the console.
+    """
+
+    def __init__(self, title: str, callback: callable = None):
+        self.title = title
+        self.callback = callback
+        self.start = None
+
+    def __enter__(self):
+        self.start = time.time()
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        diff = time.time() - self.start
+        if self.callback:
+            self.callback(f"TimeTaken - {self.title}: {diff:.4f} seconds")
+        else:
+            print(f"TimeTaken - {self.title}: {diff:.4f} seconds")
 
 
 def get_source_directory_paths(

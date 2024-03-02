@@ -5,8 +5,7 @@ from langchain.prompts import PromptTemplate
 from langchain.llms.base import LLM as LLMBase
 from langchain.chains.summarize import load_summarize_chain
 from langchain.chains.combine_documents.base import BaseCombineDocumentsChain
-
-from chatnerds.langchain import LLMFactory
+from chatnerds.langchain.llm_factory import LLMFactory
 
 
 class Summarizer:

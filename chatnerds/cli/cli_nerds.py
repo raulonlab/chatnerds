@@ -6,6 +6,7 @@ import logging
 import typer
 from chatnerds.config import Config
 
+
 YOUTUBE_SOURCES_INITIAL_CONTENT = """
 # video urls
 # https://www.youtube.com/watch?v=...
@@ -28,12 +29,12 @@ NERD_CONFIG_INITIAL_CONTENT = """
 """
 
 _global_config = Config.environment_instance()
-
 app = typer.Typer()
 
 
 @app.command(
-    "init", help="Initialize a new nerd. A nerd is a collection of sources and documents"
+    "init",
+    help="Initialize a new nerd. A nerd is a collection of sources and documents",
 )
 def init_nerd(nerd_name: str):
     if not validate_nerd_name(nerd_name):
@@ -41,7 +42,7 @@ def init_nerd(nerd_name: str):
             f"Invalid nerd name '{nerd_name}'. Nerd name must start with alphanumeric and underscore characters"
         )
         return
-    
+
     logging.debug(f"Initializing nerd '{nerd_name}'")
     nerd_path = Path(_global_config.NERDS_DIRECTORY_PATH, nerd_name)
     if nerd_path.exists():
@@ -141,7 +142,11 @@ def list_nerds():
         if not validate_nerd_name(nerd):
             continue
 
-        print(f"[ ] {nerd}") if nerd != _global_config.get_active_nerd() else print(f"[x] {nerd}")
+        (
+            print(f"[ ] {nerd}")
+            if nerd != _global_config.get_active_nerd()
+            else print(f"[x] {nerd}")
+        )
 
 
 def validate_nerd_name(nerd_name: str):

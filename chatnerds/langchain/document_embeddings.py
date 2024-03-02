@@ -1,7 +1,7 @@
 import os
 import glob
 from pathlib import Path
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Union, Optional
 from multiprocessing import Pool
 from tqdm import tqdm
 from langchain_community.embeddings import (
@@ -23,12 +23,16 @@ from langchain_community.document_loaders import (
     UnstructuredWordDocumentLoader,
 )
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_core.documents import Document
-from chatnerds.document_loaders import TranscriptLoader
+from chatnerds.document_loaders.transcript_loader import TranscriptLoader
 from chatnerds.langchain.chroma_database import (
     ChromaDatabase,
     DEFAULT_SOURCES_COLLECTION_NAME,
+    DEFAULT_PARENT_CHUNKS_COLLECTION_NAME,
 )
+from chatnerds.utils import TimeTaken
+
+DEFAULT_CHUNK_SIZE = 1000
+DEFAULT_CHUNK_OVERLAP = 100
 
 
 # Map file extensions to document loaders and their arguments
@@ -69,9 +73,9 @@ class DocumentEmbeddings:
         embeddings = self.get_embedding_function()
 
         sources_database = ChromaDatabase(
+            collection_name=DEFAULT_SOURCES_COLLECTION_NAME,
             embeddings=embeddings,
             config=self.config["chroma"],
-            collection_name=DEFAULT_SOURCES_COLLECTION_NAME,
         )
 
         # Get existing sources to not embed them again
@@ -100,36 +104,192 @@ class DocumentEmbeddings:
             return
 
         # Add source documents to the database
-        sources_database.add_documents(source_documents)
+        with TimeTaken("Add sources to database"):
+            source_ids = sources_database.add_documents(source_documents)
 
         # Split documents into chunks
-        chunk_documents = self.split_documents(source_documents)
+        # Get splitter config and fix chunk_size: It must be less than the model max sequence
+        # splitter_config = {**self.config["splitter"]}
+        # splitter_config["chunk_size"] = min(
+        #     splitter_config.get("chunk_size", DEFAULT_CHUNK_SIZE),
+        #     embeddings.client.get_max_seq_length(),
+        #     )
 
-        # Add chunks to the database
-        if len(chunk_documents) > 0:
-            chunks_database = ChromaDatabase(
-                embeddings=embeddings, config=self.config["chroma"]
+        # Get child splitter config and fix chunk_size: It must be less than the model max sequence
+        child_splitter_config = {
+            "separators": ["\n\n", "\n", ".", ",", " "],
+            "keep_separator": False,
+            "chunk_overlap": DEFAULT_CHUNK_OVERLAP,
+            "chunk_size": DEFAULT_CHUNK_SIZE,
+        } | self.config["splitter"]
+
+        # fix chunk_size: It must be less than the model max sequence
+        child_splitter_config["chunk_size"] = min(
+            child_splitter_config["chunk_size"],
+            embeddings.client.get_max_seq_length(),
+        )
+
+        # Get parent splitter config: twice the size of the child
+        parent_splitter_config = {
+            **child_splitter_config,
+            "chunk_size": 2 * child_splitter_config["chunk_size"],
+            "chunk_overlap": 2 * child_splitter_config["chunk_overlap"],
+        }
+
+        # print(f"child_splitter_config: {child_splitter_config}")
+        # print(f"parent_splitter_config: {parent_splitter_config}")
+
+        with TimeTaken("Split source to parent chunks"):
+            parent_chunks = self.split_documents(
+                source_documents, ids=source_ids, **parent_splitter_config
             )
-            chunks_database.add_documents(chunk_documents)
+
+        # Add parent chunks to the database
+        if len(parent_chunks) > 0:
+            parent_chunks_database = ChromaDatabase(
+                collection_name=DEFAULT_PARENT_CHUNKS_COLLECTION_NAME,
+                embeddings=embeddings,
+                config=self.config["chroma"],
+            )
+            with TimeTaken("Add parent chunks to database"):
+                parent_chunk_ids = parent_chunks_database.add_documents(parent_chunks)
+
+            with TimeTaken("Split parent to child chunks"):
+                child_chunks = self.split_documents(
+                    parent_chunks, ids=parent_chunk_ids, **child_splitter_config
+                )
+
+            # Add parent chunks to the database
+            if len(child_chunks) > 0:
+                child_chunks_database = ChromaDatabase(
+                    embeddings=embeddings, config=self.config["chroma"]
+                )
+                with TimeTaken("Add child chunks to database"):
+                    child_chunks_database.add_documents(child_chunks)
+
+    # def embed_directories_with_parent_child_retriever(self, source_directories: List[Union[str, Path]]) -> None:
+    #     embeddings: HuggingFaceInstructEmbeddings = self.get_embedding_function()
+
+    #     sources_database = ChromaDatabase(
+    #         embeddings=embeddings,
+    #         config=self.config["chroma"],
+    #         collection_name=DEFAULT_SOURCES_COLLECTION_NAME,
+    #     )
+
+    #     # Get existing sources to not embed them again
+    #     collection = sources_database.client.get()
+    #     all_sources = [
+    #         metadata["source"]
+    #         for metadata in collection["metadatas"]
+    #         if collection.get("metadatas") is not None
+    #     ]
+
+    #     existing_sources = []
+    #     for source in all_sources:
+    #         if source not in existing_sources:
+    #             existing_sources.append(source)
+
+    #     source_documents = []
+    #     for source_directory in source_directories:
+    #         # Load source documents
+    #         documents = self.load_documents(
+    #             source_directory, ignored_files=existing_sources
+    #         )
+    #         if len(documents) > 0:
+    #             source_documents.extend(documents)
+
+    #     if len(source_documents) == 0:
+    #         return
+
+    #     # Add source documents to the database
+    #     sources_database.add_documents(source_documents)
+
+    #     # Split documents into chunks
+    #     # Get child splitter config and fix chunk_size: It must be less than the model max sequence
+    #     child_splitter_config = {
+    #         "separators": ["\n\n", "\n", ".", ",", " "],
+    #         "keep_separator": False,
+    #         "chunk_overlap": DEFAULT_CHUNK_OVERLAP,
+    #         "chunk_size": DEFAULT_CHUNK_SIZE,
+    #     } | self.config["splitter"]
+
+    #     # fix chunk_size: It must be less than the model max sequence
+    #     child_splitter_config["chunk_size"] = min(
+    #             child_splitter_config["chunk_size"],
+    #             embeddings.client.get_max_seq_length(),
+    #         )
+
+    #     print(f"child_splitter_config: {child_splitter_config}")
+
+    #     # This text splitter is used to create the child documents
+    #     # It should create documents smaller than the parent
+    #     child_splitter = RecursiveCharacterTextSplitter(**child_splitter_config)
+
+    #     # Get parent splitter config: twice the size of the child
+    #     parent_splitter_config = {
+    #         **child_splitter_config,
+    #         "chunk_size": 2 * child_splitter_config["chunk_size"],
+    #         "chunk_overlap": 2 * child_splitter_config["chunk_overlap"],
+    #     }
+
+    #     # This text splitter is used to create the parent documents
+    #     parent_splitter = RecursiveCharacterTextSplitter(**parent_splitter_config)
+
+    #     child_database = ChromaDatabase(
+    #         embeddings=embeddings,
+    #         config=self.config["chroma"]
+    #     )
+
+    #     parent_database = ChromaDatabase(
+    #         collection_name=DEFAULT_PARENT_CHUNKS_COLLECTION_NAME,
+    #         embeddings=embeddings,
+    #         config=self.config["chroma"]
+    #     )
+
+    #     parent_child_retriever = ParentDocumentRetriever(
+    #         vectorstore=child_database.client,
+    #         docstore=parent_database.client,
+    #         child_splitter=child_splitter,
+    #         parent_splitter=parent_splitter,
+    #     )
+
+    #     parent_child_retriever.add_documents(source_documents)
+
+    #     print("parent_child_retriever.add_documents DONE!")
 
     @classmethod
-    def split_documents(cls, documents: List[Document]) -> List[Document]:
+    def split_documents(
+        cls,
+        documents: List[Document],
+        ids: Optional[List[str]] = None,
+        **splitter_kwargs,
+    ) -> List[Document]:
         """
         Load documents and split in chunks
         """
 
+        splitter_kwargs = {
+            "separators": ["\n\n", "\n", ".", ",", " "],
+            "chunk_size": DEFAULT_CHUNK_SIZE,
+            "chunk_overlap": DEFAULT_CHUNK_OVERLAP,
+            "keep_separator": False,
+        } | {**splitter_kwargs}
+
         text_splitter = RecursiveCharacterTextSplitter(
-            separators=["\n\n", "\n", ".", " "], chunk_size=900, chunk_overlap=50
-        )  # chunk_size=500, chunk_overlap=50
+            **splitter_kwargs
+        )  # .from_tiktoken_encoder
 
         texts, metadatas = [], []
-        for document in documents:
+        for index, document in enumerate(documents):
             texts.append(document.page_content)
             metadatas.append(
-                {"parent_source": document.metadata["source"], **document.metadata}
+                {
+                    **document.metadata,
+                    "parent_id": ids[index] if (ids and len(ids) > index) else None,
+                }
             )
-
-        chunks = text_splitter.create_documents(texts, metadatas=metadatas)
+        with TimeTaken("Run text splitter to create documents"):
+            chunks = text_splitter.create_documents(texts, metadatas=metadatas)
         return chunks
 
     @classmethod

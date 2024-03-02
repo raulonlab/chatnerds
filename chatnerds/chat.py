@@ -36,10 +36,7 @@ def _get_log_header(config: Dict[str, Any]) -> str:
 def chat(query: Optional[str] = None) -> None:
     config = _global_config.get_nerd_config()
 
-    # qa = get_retrieval_qa(config, callback=_handle_answer)
-    # chat_chain = ChainFactory(config).get_rag_chain()
     chat_chain = ChainFactory(config).get_rag_fusion_chain()
-    # chat_chain = ChainFactory(config).get_prompt_test_chain()
 
     interactive = not query
     print()
@@ -63,10 +60,14 @@ def chat(query: Optional[str] = None) -> None:
         log_query = f"Q:\n{escape(query)}\nA:\n"
         _write_qa_log(f"{_get_log_header(config)}{log_query}")
 
-        # res = chat_chain.invoke({ "question": query },
-        #          config={'callbacks': [ConsoleCallbackHandler()]})
+        # print("get_graph:")
+        # chat_chain.get_graph().print_ascii()
 
-        res = chat_chain.invoke(query, config={"callbacks": [ConsoleCallbackHandler()]})
+        callbacks = []
+        if (_global_config.VERBOSE > 1):
+            callbacks.append(ConsoleCallbackHandler())
+
+        res = chat_chain.invoke(query, config={'callbacks': callbacks})
 
         if isinstance(res, Dict) and "result" in res:
             _handle_answer(res["result"])

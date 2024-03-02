@@ -40,6 +40,7 @@ pdfminer-six = "^20231228"
 unstructured = "^0.12.4"
 langchain-openai = "^0.0.6"
 simsimd = ">=3.7.7,<3.8"
+tiktoken = "^0.6.0"
 
 [tool.poetry.group.dev.dependencies]
 deptry = "*"
@@ -47,7 +48,7 @@ pylint = "*"
 autoflake = "*"
 black = "*"
 pre-commit = "^3.6.0"
-mkinit = "^1.1.0"
+tuna = "^0.5.11"
 
 [build-system]
 requires = ["poetry-core"]

@@ -4,17 +4,23 @@ from operator import itemgetter
 from langchain.llms.base import LLM as LLMBase
 from langchain.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
+from langchain.chains.base import Chain
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.vectorstores import VectorStoreRetriever
 from langchain.chains import RetrievalQA
 from langchain_core.runnables import RunnableParallel
 from chatnerds.langchain.document_embeddings import DocumentEmbeddings
-from chatnerds.langchain.chroma_database import ChromaDatabase
+from chatnerds.langchain.chroma_database import (
+    ChromaDatabase,
+    DEFAULT_PARENT_CHUNKS_COLLECTION_NAME,
+)
 from chatnerds.langchain.llm_factory import LLMFactory
 from chatnerds.langchain.chain_runnables import (
-    query_expansion_runnable,
-    retrieve_best_documents_runnable_v1,
-    combine_documents_for_context_runnable,
+    question_expansion_runnable,
+    retrieve_relevant_documents_runnable,
+    rerank_documents_runnable,
+    get_parent_documents_runnable,
+    combine_documents_runnable,
 )
 from chatnerds.langchain.prompt_factory import PromptFactory
 from chatnerds.constants import DEFAULT_CHAT_SYSTEM_PROMPT
@@ -29,13 +35,20 @@ class ChainFactory:
         self.config = config
 
     # Source: https://levelup.gitconnected.com/3-query-expansion-methods-implemented-using-langchain-to-improve-your-rag-81078c1330cd
-    def get_rag_fusion_chain(self) -> Any:
+    def get_rag_fusion_chain(self) -> Chain:
         embeddings = DocumentEmbeddings(config=self.config).get_embedding_function()
 
         chroma_database = ChromaDatabase(
             embeddings=embeddings, config=self.config["chroma"]
         )
+        parent_database = ChromaDatabase(
+            collection_name=DEFAULT_PARENT_CHUNKS_COLLECTION_NAME,
+            embeddings=embeddings,
+            config=self.config["chroma"],
+        )
         self.retriever = chroma_database.client.as_retriever(**self.config["retriever"])
+        retriever_k = self.retriever.search_kwargs.get("k", 4)
+
         self.llm, prompt_type = LLMFactory(config=self.config).get_llm()
 
         system_prompt: str = self.config.get(
@@ -47,36 +60,43 @@ class ChainFactory:
             llm=self.llm, system_prompt=system_prompt, prompt_type=prompt_type
         )
 
-        n_expanded_queries: int = self.config["chain"].get("n_expanded_queries", 0)
+        n_expanded_questions: int = self.config["chain"].get("n_expanded_questions", 0)
 
-        # https://python.langchain.com/docs/expression_language/cookbook/retrieval
-        retrieved_documents = {
-            "documents": query_expansion_runnable.bind(
-                llm=self.llm,
-                prompt_type=prompt_type,
-                n_expanded_queries=n_expanded_queries,
-            )
-            | retrieve_best_documents_runnable_v1.bind(retriever=self.retriever),
-            "question": RunnablePassthrough(),
-        }
-
-        prompt_inputs = {
-            "context": itemgetter("documents") | combine_documents_for_context_runnable,
-            "question": itemgetter("question"),
-        }
-
-        results = RunnableParallel(
-            {
-                "result": prompt_inputs | qa_prompt | self.llm | StrOutputParser(),
-                "source_documents": itemgetter("documents"),
+        retrieve_relevant_documents = RunnableParallel(
+            documents={
+                "question": RunnablePassthrough(),
+                "documents": question_expansion_runnable.bind(
+                    llm=self.llm,
+                    prompt_type=prompt_type,
+                    n_expanded_questions=n_expanded_questions,
+                )
+                | retrieve_relevant_documents_runnable.bind(
+                    retriever=self.retriever,
+                ),
             }
+            | rerank_documents_runnable
+            | get_parent_documents_runnable.bind(
+                parents_db_client=parent_database.client, retriever_k=retriever_k
+            ),
+            question=RunnablePassthrough(),
         )
 
-        chain = retrieved_documents | results
+        combine_documents_in_context = RunnableParallel(
+            context=itemgetter("documents") | combine_documents_runnable,
+            question=itemgetter("question"),
+            documents=itemgetter("documents"),
+        )
+
+        get_results = RunnableParallel(
+            result=qa_prompt | self.llm | StrOutputParser(),
+            source_documents=itemgetter("documents"),
+        )
+
+        chain = retrieve_relevant_documents | combine_documents_in_context | get_results
 
         return chain
 
-    def get_prompt_test_chain(self) -> Any:
+    def get_prompt_test_chain(self) -> Chain:
         embeddings = DocumentEmbeddings(config=self.config).get_embedding_function()
 
         chroma_database = ChromaDatabase(
@@ -114,7 +134,7 @@ class ChainFactory:
 
         return chain
 
-    def get_retrieval_qa_chain(self) -> Any:
+    def get_retrieval_qa_chain(self) -> Chain:
         embeddings = DocumentEmbeddings(config=self.config).get_embedding_function()
 
         chroma_database = ChromaDatabase(
