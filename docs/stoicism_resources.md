@@ -11,7 +11,7 @@ Download these free books and copy them in `nerds/stoicism/source_documents`:
 
 ## youtube.sources
 
-Copy and paste the following urls in `nerds/stoicism/youtube.sources`. I've commented out the playlists with more than 100 videos because it takes a long time to download them. You can uncomment them if you want.
+Copy and paste the following urls in `nerds/stoicism/youtube.sources`. By default, the tool only downloads the audio of the latest 30 videos of playlists and channels. I've commented out the playlists with more than 100 videos because it takes a long time to download them. You can uncomment them if you want.
 
 ```
 # playlist urls
@@ -29,7 +29,7 @@ https://youtube.com/playlist?list=PLzKrfPkpj5onIn6D5U4Udz9EJm94ooZbh
 
 ## podcast.sources
 
-Copy and paste the following urls in `nerds/stoicism/podcast.sources`. By default, the tool only downloads the last 10 episodes of each podcast. You can change this limit with the env var `PODCAST_MAXIMUM_EPISODE_COUNT`
+Copy and paste the following urls in `nerds/stoicism/podcast.sources`. By default, the tool only downloads the latest 30 episodes of each podcast. You can change this limit with the env var `PODCAST_MAXIMUM_EPISODE_COUNT`
 
 ```
 # The Daily Stoic
