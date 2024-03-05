@@ -94,7 +94,7 @@ class PodcastDownloader:
         if not linklist:
             return
         if self.config.VERBOSE == 1:
-            logging.debug("2. Downloading content ... ", end="")
+            logging.debug("2. Downloading content ... ")
         elif self.config.VERBOSE > 1:
             logging.debug("2. Downloading content ...")
         self.downloadEpisodes(linklist, feed_info, output_path=output_path)
