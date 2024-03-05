@@ -31,7 +31,6 @@ class Summarizer:
             docs = text_splitter.split_documents(docs)
 
         summary = self.chain.invoke(docs)
-        # print("summary:\n", summary)
 
         return summary
 

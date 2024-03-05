@@ -2,32 +2,39 @@
 # Download youtube video: https://dev.to/stokry/download-youtube-video-to-mp3-with-python-26p
 # video attributes: title, description, views, rating, length, keywords, thumbnail_url, video_id, age_restricted, channel_id, channel_url, watch_url, captions, publish_date, start_time, end_time, category, tags
 
+import random
 import re
 import unicodedata
 from pathlib import Path
 from time import sleep
 import glob
 import traceback
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pytubefix import YouTube, Playlist, Channel, extract
 import music_tag
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Tuple
 import os
 import logging
+from chatnerds.tools.event_emitter import EventEmitter
 from chatnerds.config import Config
 
 
-class YoutubeDownloader:
+_RUN_TASKS_LIMIT = 1_000  # Maximum number of tasks to run in a single call to run()
+
+
+class YoutubeDownloader(EventEmitter):
     video_urls: list = []
     downloaded_urls: set = set()
     config: Config = Optional[Config]
 
     def __init__(self, source_urls: List[str] = [], config: Config = None):
+        super().__init__()
+
         if config:
             self.config = config
         else:
             self.config = Config.environment_instance()
 
-        # self.video_urls = set()
         self.add_sources(source_urls)
 
     def add_sources(self, source_urls: Union[str, List]):
@@ -58,47 +65,88 @@ class YoutubeDownloader:
                 else:
                     self.video_urls.extend(channel.video_urls)
 
-        # print("YOUTUBE_MAXIMUM_EPISODE_COUNT: ", self.config.YOUTUBE_MAXIMUM_EPISODE_COUNT)
-        # print("self.video_urls: \n", "\n".join(self.video_urls))
-
-    def run(self, output_path=".") -> List[str]:
-        logging.info(f"Running youtube downloader with {len(self.video_urls)} urls")
+    def run(self, output_path=".") -> Tuple[List[str], List[any]]:
+        logging.debug("Running youtube downloader...")
 
         # Find downloaded video ids to skip them
         downloaded_video_ids = self.find_downloaded_video_ids(output_path)
 
-        audio_output_file_paths = []
+        download_arguments = []
         for video_url in self.video_urls:
             if extract.video_id(video_url) in downloaded_video_ids:
-                logging.info(f"Video '{video_url}' already downloaded. Skipping.")
+                logging.debug(f"Video '{video_url}' already downloaded. Skipping.")
                 continue
 
-            logging.debug(f"Downloading {video_url}")
+            download_arguments.append(
+                {"url": str(video_url), "output_path": output_path}
+            )
 
-            try:
-                audio_output_file_path = self.download(
-                    url=video_url, output_path=output_path
-                )
+        # Return if no video to download
+        if len(download_arguments) == 0:
+            logging.debug("No videos to download")
+            return [], []
 
-                if audio_output_file_path:
-                    audio_output_file_paths.append(audio_output_file_path)
+        # Limit number of tasks to run
+        if len(download_arguments) > _RUN_TASKS_LIMIT:
+            download_arguments = download_arguments[:_RUN_TASKS_LIMIT]
+            logging.warning(
+                f"Number of videos to download exceeds limit of {_RUN_TASKS_LIMIT}. Only processing first {_RUN_TASKS_LIMIT} videos."
+            )
 
-                    logging.debug(
-                        f"  ...waiting {self.config.YOUTUBE_SLEEP_SECONDS_BETWEEN_DOWNLOADS} seconds"
-                    )
-                    sleep(self.config.YOUTUBE_SLEEP_SECONDS_BETWEEN_DOWNLOADS)
-            except Exception as err:
-                logging.error(
-                    f"✘ Error downloading audio from source url: {video_url}",
-                    exc_info=err,
-                )
+        logging.debug(f"Start processing {len(download_arguments)} urls...")
 
-        logging.info("\nyoutube downloader finished....")
-        return audio_output_file_paths
+        # Emit start event (show progress bar in UI)
+        self.emit("start", len(download_arguments))
 
-    def download(self, url: str, output_path=".") -> Union[str, None]:
+        max_workers = 1
+        results = []
+        errors = []
+        with ThreadPoolExecutor(
+            max_workers=max_workers, thread_name_prefix="YoutubeDownloader"
+        ) as executor:
+            response_futures = [
+                executor.submit(self.download, download_argument)
+                for download_argument in download_arguments
+            ]
+
+            for response_future in as_completed(response_futures):
+                try:
+                    response = response_future.result()
+                    if response:
+                        results.append(response)
+                except Exception as err:
+                    errors.append(err)
+                    continue
+                finally:
+                    self.emit("update")
+
+        self.emit("end")
+
+        return results, errors
+
+    def download(self, input_arguments) -> Union[str, None]:
         """Download audio from YouTube video url."""
-        yt = YouTube(url)
+
+        url: str = input_arguments["url"]
+        output_path: str = input_arguments["output_path"]
+
+        wait_seconds = random.randint(
+            self.config.YOUTUBE_SLEEP_SECONDS_BETWEEN_DOWNLOADS,
+            3 * self.config.YOUTUBE_SLEEP_SECONDS_BETWEEN_DOWNLOADS,
+        )
+        logging.debug(
+            f"Start downloading video url {url}  ...waiting {wait_seconds} seconds"
+        )
+        sleep(wait_seconds)
+
+        try:
+            yt = YouTube(url)
+        except Exception as err:
+            logging.error(
+                f"✘ Error getting video '{url}' from YouTube. Skipping download.",
+                exc_info=err,
+            )
+            return None
 
         channel_title = yt.author
         video_title = yt.title
@@ -137,7 +185,7 @@ class YoutubeDownloader:
 
         audio_output_file_path = os.path.join(output_path, audio_output_filename)
         if os.path.exists(audio_output_file_path):
-            logging.info(
+            logging.debug(
                 f"Audio file '{audio_output_file_path}' already exists. Skipping download."
             )
             self.write_tags(audio_output_file_path, yt)
@@ -147,7 +195,7 @@ class YoutubeDownloader:
         # Extract audio from video
         audio_output_file_path = None
         try:
-            logging.info(
+            logging.debug(
                 f"Downloading audio of video '{video_title}' from channel '{channel_title}'..."
             )
 
@@ -172,13 +220,13 @@ class YoutubeDownloader:
         file_stats = os.stat(audio_output_file_path)
         if file_stats.st_size > 100000000:
             logging.warning(
-                f"Size of audio file {file_stats.st_size / 1024}MB exceeds maximum of 100MB."
+                f"Size of audio file {file_stats.st_size / 1024}Mb exceeds maximum of 100Mb"
             )
-            return
+            return None
 
         # Validate downloaded audio file
         if os.path.exists(audio_output_file_path):
-            logging.info(
+            logging.debug(
                 f"✔ Audio file '{audio_output_file_path}' downloaded successfully."
             )
 

@@ -5,7 +5,8 @@ import logging
 from chatnerds.config import Config
 from chatnerds.logging_setup import setup as setup_logging
 from chatnerds.cli import cli_nerds, cli_sources, cli_tools, cli_utils, cli_db
-
+from chatnerds.utils import get_source_directory_paths
+from chatnerds.cli.cli_utils import TqdmHolder
 
 _global_config = Config.environment_instance()
 
@@ -41,10 +42,59 @@ def study_command(
 
     cli_utils.validate_confirm_active_nerd()
 
-    from chatnerds.study import study
-
     try:
-        study(directory_filter=directory_filter, source=source)
+        source_directories = get_source_directory_paths(
+            directory_filter=directory_filter,
+            source=source,
+            base_path=_global_config.get_nerd_base_path(),
+        )
+
+        from chatnerds.document_loaders.document_loader import DocumentLoader
+
+        document_loader = DocumentLoader(
+            nerd_config=_global_config.get_nerd_config(),
+            source_directories=source_directories,
+        )
+
+        tqdm_holder = TqdmHolder(desc="Loading documents", ncols=80)
+        document_loader.on("start", tqdm_holder.start)
+        document_loader.on("update", tqdm_holder.update)
+        document_loader.on("end", tqdm_holder.close)
+
+        document_loader_results, document_loader_errors = document_loader.run()
+
+        tqdm_holder.close()
+        logging.info(
+            f"{len(document_loader_results)} documents loaded successfully with {len(document_loader_errors)} errors...."
+        )
+
+        if len(document_loader_errors) > 0:
+            logging.error("Error loading documents", exc_info=document_loader_errors[0])
+            return
+
+        from chatnerds.langchain.document_embedder import DocumentEmbedder
+
+        document_embedder = DocumentEmbedder(_global_config.get_nerd_config())
+
+        tqdm_holder = TqdmHolder(desc="Embedding documents", ncols=80)
+        document_embedder.on("start", tqdm_holder.start)
+        document_embedder.on("update", tqdm_holder.update)
+        document_embedder.on("end", tqdm_holder.close)
+
+        document_embedder_results, document_embedder_errors = document_embedder.run(
+            documents=document_loader_results,
+        )
+
+        tqdm_holder.close()
+        logging.info(
+            f"{len(document_embedder_results)} documents embedded successfully with {len(document_embedder_errors)} errors...."
+        )
+
+        if len(document_embedder_errors) > 0:
+            logging.error(
+                "Error embedding documents", exc_info=document_embedder_errors[0]
+            )
+
     except Exception as e:
         logging.error(
             "Error studying sources. Try to load the sources separately with the option --source. See chatnerds add --help."
@@ -64,6 +114,15 @@ def chat_command(
             help="The query to use for retrieval. If not specified, runs in interactive mode."
         ),
     ] = None,
+    # filter: Annotated[
+    #     Optional[str],
+    #     typer.Option(
+    #         "--filter",
+    #         "-f",
+    #         case_sensitive=False,
+    #         help="Filter source documents by a string",
+    #     ),
+    # ] = None,
 ):
     cli_utils.validate_confirm_active_nerd()
 

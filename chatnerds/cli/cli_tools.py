@@ -50,7 +50,7 @@ def transcribe_youtube_command(
 
 @app.command("split")
 def split_command(input_file_path: str):
-    nerd_config = _global_config.get_nerd_config()
+    _global_config.get_nerd_config()
 
     from chatnerds.document_loaders.transcript_loader import TranscriptLoader
 
@@ -60,11 +60,9 @@ def split_command(input_file_path: str):
         print(transcript_documents)
         print("#########################\n")
 
-        from chatnerds.langchain.document_embeddings import DocumentEmbeddings
+        from chatnerds.langchain.document_embedder import DocumentEmbedder
 
-        chunks = DocumentEmbeddings(config=nerd_config).split_documents(
-            transcript_documents
-        )
+        chunks = DocumentEmbedder.split_documents(transcript_documents)
 
         print(f"Split {input_file_path}:")
         print("#########################")
@@ -137,9 +135,9 @@ def search_command(
 
     nerd_config = _global_config.get_nerd_config()
 
-    from chatnerds.langchain.document_embeddings import DocumentEmbeddings
+    from chatnerds.langchain.llm_factory import LLMFactory
 
-    embeddings = DocumentEmbeddings(config=nerd_config).get_embedding_function()
+    embeddings = LLMFactory(config=nerd_config).get_embedding_function()
 
     from chatnerds.langchain.chroma_database import ChromaDatabase
 
@@ -197,21 +195,3 @@ def search_command(
                 f"URL: {escape(metadata.get('comment', '-'))}\n\n{escape(merged_page_contents)}"
             )
         )
-
-
-@app.command("test", help="Test")
-def test_command():
-    validate_confirm_active_nerd(skip_confirmation=True)
-
-    nerd_config = _global_config.get_nerd_config()
-
-    from chatnerds.langchain.document_embeddings import DocumentEmbeddings
-
-    embeddings = DocumentEmbeddings(config=nerd_config).get_embedding_function()
-    print(f"Maximum embedded sequence length: {embeddings.client.get_max_seq_length()}")
-
-    from chatnerds.langchain.chroma_database import ChromaDatabase
-
-    database = ChromaDatabase(embeddings=embeddings, config=nerd_config["chroma"])
-
-    database.print_short_chunks()

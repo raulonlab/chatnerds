@@ -64,10 +64,10 @@ def chat(query: Optional[str] = None) -> None:
         # chat_chain.get_graph().print_ascii()
 
         callbacks = []
-        if (_global_config.VERBOSE > 1):
+        if _global_config.VERBOSE > 1:
             callbacks.append(ConsoleCallbackHandler())
 
-        res = chat_chain.invoke(query, config={'callbacks': callbacks})
+        res = chat_chain.invoke(query, config={"callbacks": callbacks})
 
         if isinstance(res, Dict) and "result" in res:
             _handle_answer(res["result"])

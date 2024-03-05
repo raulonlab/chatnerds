@@ -3,17 +3,31 @@ from enum import Enum
 
 class LogColors:
     BOLD = "\033[1m"
-    DEBUG = "\033[2m"
-    NERD = "\033[92m"
-    SOURCE = "\033[96m"
-    BOLDNERD = "\033[1m\033[92m"
-    BOLDSOURCE = "\033[1m\033[96m"
+    DISABLED = "\033[2m"
+    UNDERLINE = "\033[4m"
+    NERD = "\033[36m"
+    BOLDNERD = "\033[1m\033[36m"
+    SOURCE = "\033[94m"
+    BOLDSOURCE = "\033[1m\033[94m"
+    URL = "\033[4m\033[96m"  # underline cyan
+    ENDC = "\033[0m"
+
+    # Message / Log colors
+    OK = "\033[92m"  # green
+    INFO = "\033[94m"  # blue
+    DEBUG = "\033[2m"  # grey
+    WARNING = "\033[93m"  # yellow
+    ERROR = "\033[91m"  # red
+    FATAL = "\033[1m\033[91m"  # bold re
 
     # Other colors
-    OK = "\033[92m"
-    WARNING = "\033[95m"
-    FAIL = "\033[91m"
-    ENDC = "\033[0m"
+    PURPLE = "\033[95m"
+    CYAN = "\033[96m"
+    DARKCYAN = "\033[36m"
+    BLUE = "\033[94m"
+    GREEN = "\033[92m"
+    YELLOW = "\033[93m"
+    RED = "\033[91m"
 
 
 class Emojis:

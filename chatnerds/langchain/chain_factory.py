@@ -1,5 +1,4 @@
 from typing import Any, Dict
-import logging
 from operator import itemgetter
 from langchain.llms.base import LLM as LLMBase
 from langchain.prompts import PromptTemplate
@@ -9,7 +8,6 @@ from langchain_core.runnables import RunnablePassthrough
 from langchain_core.vectorstores import VectorStoreRetriever
 from langchain.chains import RetrievalQA
 from langchain_core.runnables import RunnableParallel
-from chatnerds.langchain.document_embeddings import DocumentEmbeddings
 from chatnerds.langchain.chroma_database import (
     ChromaDatabase,
     DEFAULT_PARENT_CHUNKS_COLLECTION_NAME,
@@ -36,7 +34,7 @@ class ChainFactory:
 
     # Source: https://levelup.gitconnected.com/3-query-expansion-methods-implemented-using-langchain-to-improve-your-rag-81078c1330cd
     def get_rag_fusion_chain(self) -> Chain:
-        embeddings = DocumentEmbeddings(config=self.config).get_embedding_function()
+        embeddings = LLMFactory(config=self.config).get_embedding_function()
 
         chroma_database = ChromaDatabase(
             embeddings=embeddings, config=self.config["chroma"]
@@ -46,6 +44,7 @@ class ChainFactory:
             embeddings=embeddings,
             config=self.config["chroma"],
         )
+
         self.retriever = chroma_database.client.as_retriever(**self.config["retriever"])
         retriever_k = self.retriever.search_kwargs.get("k", 4)
 
@@ -70,9 +69,7 @@ class ChainFactory:
                     prompt_type=prompt_type,
                     n_expanded_questions=n_expanded_questions,
                 )
-                | retrieve_relevant_documents_runnable.bind(
-                    retriever=self.retriever,
-                ),
+                | retrieve_relevant_documents_runnable.bind(retriever=self.retriever),
             }
             | rerank_documents_runnable
             | get_parent_documents_runnable.bind(
@@ -97,13 +94,13 @@ class ChainFactory:
         return chain
 
     def get_prompt_test_chain(self) -> Chain:
-        embeddings = DocumentEmbeddings(config=self.config).get_embedding_function()
+        embeddings = LLMFactory(config=self.config).get_embedding_function()
 
         chroma_database = ChromaDatabase(
             embeddings=embeddings, config=self.config["chroma"]
         )
         self.retriever = chroma_database.client.as_retriever(**self.config["retriever"])
-        # get llm model
+
         self.llm, prompt_type = LLMFactory(config=self.config).get_llm()
 
         system_prompt: str = self.config.get(
@@ -125,17 +122,10 @@ class ChainFactory:
             | StrOutputParser()
         )
 
-        logging.debug(
-            f"get_prompt_test_chain: input_schema:\n{chain.input_schema.schema()}"
-        )
-        logging.debug(
-            f"get_prompt_test_chain: chain.get_prompts():\n{chain.get_prompts()}"
-        )
-
         return chain
 
     def get_retrieval_qa_chain(self) -> Chain:
-        embeddings = DocumentEmbeddings(config=self.config).get_embedding_function()
+        embeddings = LLMFactory(config=self.config).get_embedding_function()
 
         chroma_database = ChromaDatabase(
             embeddings=embeddings, config=self.config["chroma"]

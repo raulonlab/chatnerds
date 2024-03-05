@@ -80,35 +80,32 @@ class PodcastDownloader:
 
     def processFeed(self, feed_url, output_path="."):
         if self.config.VERBOSE > 0:
-            print(
-                f"\nDownloading archive for: {feed_url}\n1. Gathering link list ...",
-                end="",
-                flush=True,
+            logging.debug(
+                f"\nDownloading archive for: {feed_url}\n1. Gathering link list ..."
             )
 
         linklist, feed_info = self.processPodcastLink(feed_url, output_path=output_path)
         if self.config.VERBOSE == 1:
-            print("%d episodes to process" % len(linklist))
+            logging.debug("%d episodes to process" % len(linklist))
         if self.config.VERBOSE > 2:
-            print("\n\tFeed info:")
+            logging.debug("\tFeed info:")
             for key, value in feed_info.items():
-                print("\t * %10s: %s" % (key, value))
-            print()
+                logging.debug("\t * %10s: %s" % (key, value))
         if not linklist:
             return
         if self.config.VERBOSE == 1:
-            print("2. Downloading content ... ", end="")
+            logging.debug("2. Downloading content ... ", end="")
         elif self.config.VERBOSE > 1:
-            print("2. Downloading content ...")
+            logging.debug("2. Downloading content ...")
         self.downloadEpisodes(linklist, feed_info, output_path=output_path)
 
     def run(self, output_path="."):
         if self.config.VERBOSE > 0 and self.config.PODCAST_UPDATE_ARCHIVE:
-            print("Updating archive")
+            logging.debug("Updating archive")
         for feed_url in self.feedlist:
             self.processFeed(feed_url, output_path=output_path)
         if self.config.VERBOSE > 0:
-            print("\nDone.")
+            logging.debug("Done.")
 
     @staticmethod
     def slugifyString(filename):
@@ -188,7 +185,7 @@ class PodcastDownloader:
 
         # Escape improper feed-URL
         if not response.ok:
-            print("\nQuery returned HTTP error", response.status_code)
+            logging.error(f"Query returned HTTP error {response.status_code}")
             return None
 
         feedobj = feedparser.parse(response.content)
@@ -196,7 +193,7 @@ class PodcastDownloader:
         if feedobj["bozo"] == 1 and not isinstance(
             feedobj["bozo_exception"], CharacterEncodingOverride
         ):
-            print("\nDownloaded feed is malformatted on", feed_url)
+            logging.error(f"Downloaded feed is malformatted on {feed_url}")
             return None
 
         return feedobj
@@ -213,7 +210,7 @@ class PodcastDownloader:
                 if path.isfile(filename):
                     del linklist[index:]
                     if self.config.VERBOSE > 1:
-                        print(
+                        logging.debug(
                             f" found existing episodes, {len(linklist)} new to process"
                         )
                     return True, linklist
@@ -224,7 +221,7 @@ class PodcastDownloader:
         ) > 0 and max_count < len(linklist):
             linklist = linklist[0:max_count]
             if self.config.VERBOSE > 1:
-                print(f" reached maximum episode count of {max_count}")
+                logging.info(f" reached maximum episode count of {max_count}")
             return True, linklist
 
         return False, linklist
@@ -235,7 +232,7 @@ class PodcastDownloader:
         if feed_info.get("title"):
             return feed_info
 
-        print("✗ Feed is missing title information.")
+        logging.warn("✗ Feed is missing title information.")
         return None
 
     def processPodcastLink(self, feed_next_page, output_path="."):
@@ -260,11 +257,9 @@ class PodcastDownloader:
             if not feed_next_page or was_truncated:
                 break
 
-            if self.config.VERBOSE > 0:
-                print(".", end="", flush=True)
+            logging.debug(".")
 
-        if self.config.VERBOSE == 1:
-            print(" ", end="", flush=True)
+        logging.debug(" ")
         linklist.reverse()
         return linklist, feed_info
 
@@ -279,33 +274,29 @@ class PodcastDownloader:
             output_path=output_path,
         )
 
-        if self.config.VERBOSE > 1:
-            print("\tLocal filename:", filename)
+        logging.debug(f"\tLocal filename: {filename}")
 
         if path.isfile(filename):
-            if self.config.VERBOSE > 1:
-                print("\t✓ Already exists.")
+            logging.debug("\t✓ Already exists.")
             return None
 
         return filename
 
     def logDownloadHeader(self, link, episode_dict, *, index, total):
         if self.config.VERBOSE == 1:
-            print(
-                "\r2. Downloading episodes ... {0}/{1}".format(index + 1, total),
-                end="",
-                flush=True,
+            logging.info(
+                "\r2. Downloading episodes ... {0}/{1}".format(index + 1, total)
             )
         elif self.config.VERBOSE > 1:
-            print(
+            logging.info(
                 "\n\tDownloading episode no. {0}/{1}:\n\t{2}".format(
                     index + 1, total, link
                 )
             )
         if self.config.VERBOSE > 2:
-            print("\tEpisode info:")
+            logging.info("\tEpisode info:")
             for key, value in episode_dict.items():
-                print("\t * %10s: %s" % (key, value))
+                logging.info("\t * %10s: %s" % (key, value))
 
     def processResponse(
         self, response, *, filename, feed_info, episode_dict, output_path="."
@@ -322,11 +313,11 @@ class PodcastDownloader:
         if new_filename and new_filename != filename:
             filename = new_filename
             if self.config.VERBOSE > 1:
-                print("\tResolved filename:", filename)
+                logging.debug(f"\tResolved filename: {filename}")
 
             if path.isfile(filename):
                 if self.config.VERBOSE > 1:
-                    print("\t✓ Already exists.")
+                    logging.debug("\t✓ Already exists.")
                 return
 
         # Create the subdir, if it does not exist
@@ -335,7 +326,7 @@ class PodcastDownloader:
 
         if self.config.PODCAST_SHOW_PROGRESS_BAR:
             if self.config.VERBOSE < 2:
-                print(f"\nDownloading {filename}")
+                logging.debug(f"\nDownloading {filename}")
             total_size = int(response.headers.get("content-length", "0"))
             progress_bar = tqdm(
                 total=total_size, unit="B", unit_scale=True, unit_divisor=1024
@@ -369,7 +360,7 @@ class PodcastDownloader:
                 output_path=output_path,
             )
             if self.config.VERBOSE > 1:
-                print("\t✓ Download successful.")
+                logging.debug("\t✓ Download successful.")
         except (urllib.error.HTTPError, urllib.error.URLError) as error:
             if self.config.VERBOSE > 1:
                 logging.error("\t✗ Download failed. Query returned '%s'" % error)

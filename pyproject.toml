@@ -40,7 +40,7 @@ pdfminer-six = "^20231228"
 unstructured = "^0.12.4"
 langchain-openai = "^0.0.6"
 simsimd = ">=3.7.7,<3.8"
-tiktoken = "^0.6.0"
+tiktoken = ">=0.3.3,<1"
 
 [tool.poetry.group.dev.dependencies]
 deptry = "*"
@@ -49,6 +49,8 @@ autoflake = "*"
 black = "*"
 pre-commit = "^3.6.0"
 tuna = "^0.5.11"
+# whisper-mps = { version = "^0.0.7", python = ">=3.11" }
+pretty-errors = "^1.2.25"
 
 [build-system]
 requires = ["poetry-core"]

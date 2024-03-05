@@ -1,6 +1,14 @@
+import io
+from contextlib import redirect_stdout
 import logging
 from typing import Any, Callable, Dict, Optional
 from langchain.llms.base import LLM as LLMBase
+from langchain_core.embeddings import Embeddings
+from langchain_community.embeddings import (
+    HuggingFaceInstructEmbeddings,
+    HuggingFaceEmbeddings,
+)
+from chatnerds.config import Config
 
 
 class LLMFactory:
@@ -12,6 +20,22 @@ class LLMFactory:
     ):
         self.config = config
         self.callback = callback
+
+    def get_embedding_function(self) -> Embeddings:
+        embeddings_config = {**self.config["embeddings"]}
+        if embeddings_config["model_name"].startswith("hkunlp/"):
+            provider_class = HuggingFaceInstructEmbeddings
+        else:
+            provider_class = HuggingFaceEmbeddings
+
+        # capture module stdout and log them
+        trap_stdout = io.StringIO()
+        with redirect_stdout(trap_stdout):
+            provider_instance = provider_class(**embeddings_config)
+
+        logging.debug(trap_stdout.getvalue())
+
+        return provider_instance
 
     def get_llm(self) -> LLMBase:
         # class CallbackHandler(BaseCallbackHandler):
@@ -66,9 +90,6 @@ class LLMFactory:
     def load_llm_from_config(
         cls, model_id, model_basename=None, device_type=None, **kwargs
     ) -> LLMBase:
-        logging.info(f"Loading Model: '{model_id}', device_type: '{device_type}'")
-        logging.info("This action can take a few minutes!")
-
         if model_basename is not None:
             model_basename_lowered = model_basename.lower()
 
@@ -125,7 +146,7 @@ class LLMFactory:
         from langchain_community.llms import HuggingFacePipeline
 
         llm = HuggingFacePipeline(pipeline=pipe)
-        logging.info("Local LLM Loaded")
+        logging.debug("Local LLM Loaded")
 
         return llm
 

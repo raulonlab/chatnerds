@@ -9,7 +9,6 @@ from chatnerds.langchain.chroma_database import (
 from chatnerds.enums import LogColors
 from chatnerds.config import Config
 
-
 _global_config = Config.environment_instance()
 app = typer.Typer()
 
@@ -48,6 +47,10 @@ def summary_command():
     print(
         f"- DB Path:              {LogColors.BOLD}{nerd_config['chroma']['persist_directory']}{LogColors.ENDC}"
     )
+    if hasattr(sources_db.client._collection._client, "max_batch_size"):
+        print(
+            f"- max_batch_size: {LogColors.BOLD}{sources_db.client._collection._client.max_batch_size}{LogColors.ENDC}"
+        )
     print(
         f"- Num source documents: {LogColors.BOLD}{len(sources_collection['metadatas'])}{LogColors.ENDC}"
     )
@@ -89,15 +92,33 @@ def sources_command(
             source_metadata["source"],
             source_metadata["artist"],
             source_metadata["title"],
+            source_metadata["album"],
         ):
             continue
 
-        pretty_source = str(
-            source_metadata.get("source", "(Source not found)")
-        ).removeprefix(str(_global_config.get_nerd_base_path()))
+        pretty_artist = source_metadata.get("artist", "")
+        if not pretty_artist:
+            pretty_artist = source_metadata.get("album", "")
+        if not pretty_artist:
+            pretty_artist = f"{LogColors.DISABLED}(Unknown artist){LogColors.ENDC}"
+
+        pretty_title = source_metadata.get("title", "")
+        if not pretty_title:
+            pretty_title = f"{LogColors.DISABLED}(Unknown title){LogColors.ENDC}"
+
+        pretty_url = source_metadata.get("comment", "")
+        if not pretty_url:
+            pretty_url = f"{LogColors.DISABLED}(no url){LogColors.ENDC}"
+
+        pretty_source = str(source_metadata.get("source", "")).removeprefix(
+            str(_global_config.get_nerd_base_path())
+        )
+        if not pretty_source:
+            pretty_source = f"{LogColors.DISABLED}(Source not found){LogColors.ENDC}"
+
         print(f"- {LogColors.BOLDSOURCE}{pretty_source}{LogColors.ENDC}")
         print(
-            f"  {source_metadata.get('artist', '(Unknown artist)')} - {source_metadata.get('title', '(Unknown title)')}"
+            f"  {pretty_artist} - {pretty_title}\n  {LogColors.UNDERLINE}{pretty_url}{LogColors.ENDC}"
         )
 
 
@@ -119,8 +140,6 @@ def chunks_command(
     validate_confirm_active_nerd(skip_confirmation=True)
 
     nerd_config = _global_config.get_nerd_config()
-
-    embeddings = DocumentEmbeddings(config=nerd_config).get_embedding_function()
 
     sources_db = ChromaDatabase(
         collection_name=DEFAULT_SOURCES_COLLECTION_NAME, config=nerd_config["chroma"]
@@ -146,16 +165,37 @@ def chunks_command(
             source_metadata["source"],
             source_metadata["artist"],
             source_metadata["title"],
+            source_metadata["album"],
         ):
             continue
 
-        pretty_source = str(
-            source_metadata.get("source", "(Source not found)")
-        ).removeprefix(str(_global_config.get_nerd_base_path()))
+        pretty_artist = source_metadata.get("artist", "")
+        if not pretty_artist:
+            pretty_artist = source_metadata.get("album", "")
+        if not pretty_artist:
+            pretty_artist = f"{LogColors.DISABLED}(Unknown artist){LogColors.ENDC}"
+
+        pretty_title = source_metadata.get("title", "")
+        if not pretty_title:
+            pretty_title = f"{LogColors.DISABLED}(Unknown title){LogColors.ENDC}"
+
+        pretty_url = source_metadata.get("comment", "")
+        if not pretty_url:
+            pretty_url = f"{LogColors.DISABLED}(no url){LogColors.ENDC}"
+
+        pretty_source = str(source_metadata.get("source", "")).removeprefix(
+            str(_global_config.get_nerd_base_path())
+        )
+        if not pretty_source:
+            pretty_source = f"{LogColors.DISABLED}(Source not found){LogColors.ENDC}"
+
         print(f"- {LogColors.BOLDSOURCE}{pretty_source}{LogColors.ENDC}")
-        for key, value in source_metadata.items():
-            if key != "source":
-                print(f"  {key}: {value}")
+        print(
+            f"  {pretty_artist} - {pretty_title}\n  {LogColors.UNDERLINE}{pretty_url}{LogColors.ENDC}"
+        )
+        # for key, value in source_metadata.items():
+        #     if key != "source":
+        #         print(f"  {key}: {value}")
         # Get parent chunks count
         count_parent_chunks = 0
         count_parent_characters = 0
@@ -183,8 +223,3 @@ def chunks_command(
                 )
         print(f"  num child chunks: {count_child_chunks}")
         print(f"  avg child chunk size: {count_child_characters / count_child_chunks}")
-
-        # print("-------------------")
-
-    # print("\nSource ids:")
-    # print("\n".join(sources_collection['ids']))

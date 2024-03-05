@@ -2,24 +2,36 @@
 # Audio transcriber: https://github.com/KostasEreksonas/Audio-transcriber/blob/main/transcriber.py
 # Translate transcribed text. Credit to Harsh Jain at educative.io: https://www.educative.io/answers/how-do-you-translate-text-using-python
 
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Tuple
 import os
 import glob
 import logging
 import torch
 import whisper
 import music_tag
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from chatnerds.config import Config
+from chatnerds.utils import check_for_package
 from chatnerds.langchain.summarizer import Summarizer
+from chatnerds.tools.event_emitter import EventEmitter
+
+try:
+    from whisper_mps import whisper as whispermps
+except ImportError:
+    pass
 
 
-class AudioTranscriber:
+_RUN_TASKS_LIMIT = 1_000  # Maximum number of tasks to run in a single call to run()
+
+
+class AudioTranscriber(EventEmitter):
     source_directory: str
     config: Config = Optional[Config]
-    model: any = None
-    summarizer: Summarizer = None
+    summarizer: Optional[Summarizer] = None
 
     def __init__(self, source_directory: str = ".", config: Config = None):
+        super().__init__()
+
         if config:
             self.config = config
         else:
@@ -27,12 +39,15 @@ class AudioTranscriber:
 
         self.source_directory = source_directory
 
-    def run(self, filter_directory: str = "", output_path: str = None) -> List[str]:
+    def run(
+        self, filter_directory: str = "", output_path: str = None
+    ) -> Tuple[List[str], List[any]]:
+        logging.debug("Running audio transcriber...")
+
+        logging.debug("Finding existing transcript files (to skip them)...")
         audio_files = self.find_audio_files(self.source_directory)
 
-        logging.info(f"Running transcriber with {len(audio_files)} audio files")
-
-        transcript_file_paths = []
+        transcribe_audio_arguments = []
         for audio_file in audio_files:
             if filter_directory and filter_directory not in audio_file:
                 continue
@@ -54,46 +69,116 @@ class AudioTranscriber:
                 )
 
             if os.path.exists(transcript_file_path):
-                transcript_file_paths.append(transcript_file_path)
                 continue
 
-            logging.debug(f"  ...transcribing: {audio_file}")
-            transcript = self.transcribe_audio(
-                input_audio_file_path=str(audio_file),
-                model_name=self.config.WHISPER_TRANSCRIPTION_MODEL_NAME,
+            transcribe_audio_arguments.append(
+                {
+                    "input_audio_file_path": str(audio_file),
+                    "transcript_file_path": transcript_file_path,
+                    "model_name": self.config.WHISPER_TRANSCRIPTION_MODEL_NAME,
+                }
             )
 
-            audio_file_tags = self.read_audio_file_tags(str(audio_file))
+        # Return if no audio files to transcribe
+        if len(transcribe_audio_arguments) == 0:
+            logging.debug("No audio files to transcribe")
+            return [], []
 
-            # if (self.config.TRANSCRIPT_ADD_SUMMARY is True):
-            #     if (self.summarizer is None):
-            #         self.summarizer = Summarizer(config=self.config.get_nerd_config())
-            #     summary = self.summarizer.summarize_text(transcript)
+        # Limit number of tasks to run
+        if len(transcribe_audio_arguments) > _RUN_TASKS_LIMIT:
+            transcribe_audio_arguments = transcribe_audio_arguments[:_RUN_TASKS_LIMIT]
+            logging.warning(
+                f"Number of audios to transcribe exceeds limit of {_RUN_TASKS_LIMIT}. Only processing first {_RUN_TASKS_LIMIT} videos."
+            )
 
-            with open(transcript_file_path, "w", encoding="utf-8") as file:
-                file.write(f'transcript="{self.escape_dotenv_value(transcript)}"\n')
-                # if (summary is not None):
-                #     file.write(f"summary=\"{self.escape_dotenv_value(summary)}\"\n")
-                for tag_key, tag_value in audio_file_tags.items():
-                    file.write(f'{tag_key}="{self.escape_dotenv_value(tag_value)}"\n')
+        logging.debug(
+            f"Start processing {len(transcribe_audio_arguments)} audio files..."
+        )
 
-            transcript_file_paths.append(transcript_file_path)
+        # Emit start event (show progress bar in UI)
+        self.emit("start", len(transcribe_audio_arguments))
 
-        logging.info("\nTranscript finished....")
-        return transcript_file_paths
+        results = []
+        errors = []
+        max_workers = max(1, os.cpu_count() // 3)
+        with ProcessPoolExecutor(max_workers=max_workers) as executor:
+            response_futures = [
+                executor.submit(AudioTranscriber.transcribe_audio, transcribe_argument)
+                for transcribe_argument in transcribe_audio_arguments
+            ]
 
-    def transcribe_audio(self, input_audio_file_path: str, model_name: str = "tiny"):
+            for response_future in as_completed(response_futures):
+                try:
+                    response = response_future.result()
+                    if response:
+                        results.append(response)
+                except Exception as err:
+                    errors.append(err)
+                    continue
+                finally:
+                    self.emit("update")
+
+        self.emit("end")
+        return results, errors
+
+    @staticmethod
+    def transcribe_audio(input_arguments):
+        input_audio_file_path = input_arguments["input_audio_file_path"]
+        transcript_file_path = input_arguments["transcript_file_path"]
+        model_name = input_arguments["model_name"]
+
+        if check_for_package("whisper_mps"):
+            transcript = AudioTranscriber.transcribe_audio_using_mps(
+                input_audio_file_path=input_audio_file_path, model_name=model_name
+            )
+        else:
+            transcript = AudioTranscriber.transcribe_audio_using_cpu(
+                input_audio_file_path=input_audio_file_path, model_name=model_name
+            )
+
+        audio_file_tags = AudioTranscriber.read_audio_file_tags(
+            str(input_audio_file_path)
+        )
+
+        with open(transcript_file_path, "w", encoding="utf-8") as file:
+            file.write(
+                f'transcript="{AudioTranscriber.escape_dotenv_value(transcript)}"\n'
+            )
+            for tag_key, tag_value in audio_file_tags.items():
+                file.write(
+                    f'{tag_key}="{AudioTranscriber.escape_dotenv_value(tag_value)}"\n'
+                )
+
+        return transcript_file_path
+
+    @staticmethod
+    def transcribe_audio_using_cpu(input_audio_file_path: str, model_name: str):
+        """Transcribe audio file."""
+
+        """Load speech recognition model."""
+        logging.debug(f"Loading model '{model_name}'...")
+        model = whisper.load_model(model_name, device=AudioTranscriber.check_device())
+
+        logging.debug(
+            f"Transcribing audio using CPU / GPU (No MPS): '{input_audio_file_path}' ..."
+        )
+        result = model.transcribe(input_audio_file_path)
+
+        # Free memory?
+        model = None
+
+        """Put a newline character after each sentence in the transcript."""
+        formatted_text = result["text"].replace(". ", ".\n")
+
+        return formatted_text
+
+    @staticmethod
+    def transcribe_audio_using_mps(input_audio_file_path: str, model_name: str):
         """Transcribe audio file."""
 
         """Get speech recognition model."""
-        logging.info(f"Transcribing audio '{input_audio_file_path}' ...")
-        if self.model is None:
-            logging.info(
-                f"Loading model '{model_name}' with device '{self.check_device()}' ..."
-            )
-            self.model = whisper.load_model(model_name, device=self.check_device())
-            logging.info("Model loaded successfully")
-        result = self.model.transcribe(input_audio_file_path)
+        logging.debug(f"Transcribing audio using MPS: '{input_audio_file_path}' ...")
+        result = whispermps.transcribe(input_audio_file_path, model=model_name)
 
         """Put a newline character after each sentence in the transcript."""
         formatted_text = result["text"].replace(". ", ".\n")
@@ -102,13 +187,10 @@ class AudioTranscriber:
 
     @staticmethod
     def find_audio_files(directory_path: str):
-        audio_files = []
-        for filename in glob.iglob(
-            os.path.join(directory_path, "./**/*.mp3"), recursive=True
-        ):
-            audio_files.append(os.path.abspath(filename))
+        pathname = os.path.join(directory_path, "./**/*.mp3")
+        sorted_files = sorted(glob.iglob(pathname, recursive=True), reverse=True)
 
-        return audio_files
+        return [os.path.abspath(file) for file in sorted_files]
 
     @staticmethod
     def read_audio_file_tags(filepath: str) -> Dict[str, str]:

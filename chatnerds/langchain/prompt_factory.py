@@ -43,8 +43,6 @@ class PromptFactory:
 
         prompt = ChatPromptTemplate.from_messages(prompt_messages)
 
-        # print(f"PromptFactory._get_rag_prompt_generic: prompt=\n{prompt.get_prompts()}")
-
         return prompt
 
     def _get_rag_prompt_by_type(
@@ -88,8 +86,6 @@ class PromptFactory:
         prompt = PromptTemplate(
             input_variables=["context", "question"], template=prompt_template
         )
-
-        # print(f"PromptFactory._get_rag_prompt_by_type: prompt=\n{prompt.get_prompts()}")
 
         return prompt
 

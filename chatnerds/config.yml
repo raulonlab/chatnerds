@@ -1,6 +1,6 @@
 system_prompt: Use the following pieces of context to answer the question at the end. If you don't know the answer, just say that you don't know, don't try to make up an answer.
 use_history: false
-device_type: mps    # (default: cpu) Select device type: cuda, mps, cpu
+device_type: mps    # (default: mps) Select device type: cuda, mps, cpu
 summarize_chain_type: "stuff"  # (default: stuff) Select summarization chain type: stuff, map_reduce, refine
 
 embeddings:
@@ -149,4 +149,4 @@ retriever:
 
 chain:
   n_expanded_questions: 3  # Number of similar questions to expand the original query with. Set 0 to disable query expansion. (Default: 3)
-  use_cross_encoding_rerank: true  # Use cross-chain summarization. (Default: True)
+  # use_cross_encoding_rerank: true  # Use cross-chain summarization. (Default: True)

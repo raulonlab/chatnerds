@@ -6,6 +6,7 @@ from chatnerds.cli.cli_utils import (
     SourceOption,
     DirectoryFilterArgument,
     validate_confirm_active_nerd,
+    TqdmHolder,
 )
 from chatnerds.utils import get_source_directory_paths
 from chatnerds.config import Config
@@ -27,10 +28,21 @@ def download_sources(source: SourceOption = None):
         youtube_downloader = YoutubeDownloader(
             source_urls=_global_config.get_nerd_youtube_sources(), config=_global_config
         )
-        youtube_downloader.run(
+
+        tqdm_holder = TqdmHolder(desc="Downloading youtube sources", ncols=80)
+        youtube_downloader.on("start", tqdm_holder.start)
+        youtube_downloader.on("update", tqdm_holder.update)
+        youtube_downloader.on("end", tqdm_holder.close)
+
+        results, errors = youtube_downloader.run(
             output_path=str(
                 Path(_global_config.get_nerd_base_path(), "downloads", "youtube")
-            )
+            ),
+        )
+
+        tqdm_holder.close()
+        logging.info(
+            f"{len(results)} youtube audio files downloaded successfully with {len(errors)} errors...."
         )
 
     # Padcasts downloader
@@ -67,5 +79,54 @@ def transcribe_sources(
         audio_transcriber = AudioTranscriber(
             source_directory=str(source_directory), config=_global_config
         )
-        logging.info(f"Transcribing directory: {source_directory}")
-        audio_transcriber.run()
+
+        tqdm_holder = TqdmHolder(desc="Transcribing sources", ncols=80)
+        audio_transcriber.on("start", tqdm_holder.start)
+        audio_transcriber.on("update", tqdm_holder.update)
+        audio_transcriber.on("end", tqdm_holder.close)
+
+        results, errors = audio_transcriber.run()
+
+        tqdm_holder.close()
+        logging.info(
+            f"{len(results)} audios transcribed successfully with {len(errors)} errors...."
+        )
+
+
+@app.command("list-sources", help="Summarize transcribed documents")
+def list_sources_command(
+    directory_filter: DirectoryFilterArgument = None,
+    source: SourceOption = None,
+) -> None:
+
+    validate_confirm_active_nerd()
+
+    source_directories = get_source_directory_paths(
+        directory_filter=directory_filter,
+        source=source,
+        base_path=_global_config.get_nerd_base_path(),
+    )
+
+    from chatnerds.document_loaders.document_loader import DocumentLoader
+
+    try:
+        document_loader = DocumentLoader(
+            nerd_config=_global_config.get_nerd_config(),
+            source_directories=source_directories,
+        )
+
+        tqdm_holder = TqdmHolder(desc="Loading documents", ncols=80)
+        document_loader.on("start", tqdm_holder.start)
+        document_loader.on("update", tqdm_holder.update)
+        document_loader.on("end", tqdm_holder.close)
+
+        results, errors = document_loader.run()
+
+        tqdm_holder.close()
+        logging.info(
+            f"{len(results)} documents loaded successfully with {len(errors)} errors...."
+        )
+
+    except Exception as e:
+        logging.error(f"Error adding source directories: {source_directories}.")
+        raise e

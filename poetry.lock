@@ -3213,6 +3213,20 @@ pyyaml = ">=5.1"
 virtualenv = ">=20.10.0"
 
 [[package]]
+name = "pretty-errors"
+version = "1.2.25"
+description = "Prettifies Python exception output to make it legible."
+optional = false
+python-versions = "*"
+files = [
+    {file = "pretty_errors-1.2.25-py3-none-any.whl", hash = "sha256:8ce68ccd99e0f2a099265c8c1f1c23b7c60a15d69bb08816cb336e237d5dc983"},
+    {file = "pretty_errors-1.2.25.tar.gz", hash = "sha256:a16ba5c752c87c263bf92f8b4b58624e3b1e29271a9391f564f12b86e93c6755"},
+]
+
+[package.dependencies]
+colorama = "*"
+
+[[package]]
 name = "protobuf"
 version = "4.25.3"
 description = ""
@@ -5789,4 +5803,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<3.12"
-content-hash = "025046fbef8ac9f2e95b990c1c04027448e64952350f15ee80f2ff6af9ec000e"
+content-hash = "9d91b0c34064e44993b89c17da5bd8aef50973452024e1c40c1fecf2d6c989fa"

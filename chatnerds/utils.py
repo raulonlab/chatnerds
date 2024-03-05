@@ -1,4 +1,6 @@
 import os
+import sys
+import importlib.util
 import time
 from pathlib import Path
 from typing import List
@@ -84,3 +86,35 @@ def get_source_directory(
         source_directories.append(Path(base_path, SOURCE_PATHS[source.value]))
 
     return source_directories
+
+
+# borrowed from: https://stackoverflow.com/a/1051266/656011
+def check_for_package(package):
+    if package in sys.modules:
+        return True
+    elif (spec := importlib.util.find_spec(package)) is not None:
+        try:
+            module = importlib.util.module_from_spec(spec)
+
+            sys.modules[package] = module
+            spec.loader.exec_module(module)
+
+            return True
+        except ImportError:
+            return False
+    else:
+        return False
+
+
+# Yield successive n-sized chunks from l.
+def divide_list_in_chunks(input_list: list, chunk_size: int):
+    # looping till length chunk_size
+    for i in range(0, len(input_list), chunk_size):
+        yield input_list[i : i + chunk_size]
+
+
+def process_memory_limit(limit):
+    import resource as rs
+
+    soft, hard = rs.getrlimit(rs.RLIMIT_AS)
+    rs.setrlimit(rs.RLIMIT_AS, (limit, hard))
