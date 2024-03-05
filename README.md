@@ -83,11 +83,6 @@ If you downloaded youtube or podcast sources, start transcribing the audios into
 chatnerds transcribe-sources
 ```
 
-See the list of transcribed sources:
-```shell
-chatnerds list-sources
-```
-
 ### Study
 
 Once you have all the documents in `source_documents` and `downloads/...`, you can tell the active nerd to start ingesting the documents in the vector DB:
