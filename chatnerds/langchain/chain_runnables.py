@@ -147,7 +147,7 @@ def get_parent_documents_runnable(
             )
         )
 
-    return result_documents[:retriever_k]
+    return result_documents[:min(retriever_k, len(result_documents))]
 
 
 @chain

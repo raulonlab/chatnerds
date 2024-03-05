@@ -49,7 +49,7 @@ class YoutubeDownloader(EventEmitter):
                 if (self.config.YOUTUBE_MAXIMUM_EPISODE_COUNT) > 0:
                     self.video_urls.extend(
                         playlist.video_urls[
-                            0 : self.config.YOUTUBE_MAXIMUM_EPISODE_COUNT
+                            0 : min(self.config.YOUTUBE_MAXIMUM_EPISODE_COUNT, len(playlist.video_urls))
                         ]
                     )
                 else:
@@ -59,7 +59,7 @@ class YoutubeDownloader(EventEmitter):
                 if (self.config.YOUTUBE_MAXIMUM_EPISODE_COUNT) > 0:
                     self.video_urls.extend(
                         channel.video_urls[
-                            0 : self.config.YOUTUBE_MAXIMUM_EPISODE_COUNT
+                            0 : min(self.config.YOUTUBE_MAXIMUM_EPISODE_COUNT, len(playlist.video_urls))
                         ]
                     )
                 else:
