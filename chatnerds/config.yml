@@ -11,8 +11,8 @@ embeddings:
 llm: mistral01_gguf
 
 splitter:
-  chunk_size: 600  # (default: 1000) Maximum number of tokens per chunk.
-  chunk_overlap: 60  # (default: 100) Number of tokens to overlap between chunks.
+  chunk_size: 1000  # (default: 1000) Maximum number of tokens per chunk.
+  chunk_overlap: 100  # (default: 100) Number of tokens to overlap between chunks.
   # keep_separator: false  # (default: false) Keep the separator token at the end of each chunk.
 
 retriever:
@@ -27,7 +27,7 @@ retriever:
 chat_chain:
   n_expanded_questions: 3  # Number of similar questions to expand the original query with. Set 0 to disable query expansion. (Default: 3)
   use_cross_encoding_rerank: true  # Use cross-encoding reranking of retrieved documents. (Default: true)
-  n_combined_documents: 4  # Number of documents to combine as a context for the prompt sent to the LLM. (Default: 4)
+  n_combined_documents: 6  # Number of documents to combine as a context for the prompt sent to the LLM. (Default: 6)
 
 chroma:
   is_persistent: true
