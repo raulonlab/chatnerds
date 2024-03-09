@@ -9,7 +9,7 @@ from chatnerds.config import Config
 from chatnerds.logging_setup import setup as setup_logging
 from chatnerds.cli import cli_nerds, cli_sources, cli_tools, cli_utils, cli_db
 from chatnerds.utils import get_filtered_directories
-from chatnerds.cli.cli_utils import TqdmHolder
+from chatnerds.tools.chat_logger import ChatLogger
 
 _global_config = Config.environment_instance()
 
@@ -61,7 +61,7 @@ def study_command(
             source_directories=source_directories,
         )
 
-        tqdm_holder = TqdmHolder(desc="Loading documents", ncols=80)
+        tqdm_holder = cli_utils.TqdmHolder(desc="Loading documents", ncols=80)
         document_loader.on("start", tqdm_holder.start)
         document_loader.on("update", tqdm_holder.update)
         document_loader.on("end", tqdm_holder.close)
@@ -81,7 +81,7 @@ def study_command(
 
         document_embedder = DocumentEmbedder(_global_config.get_nerd_config())
 
-        tqdm_holder = TqdmHolder(desc="Embedding documents", ncols=80)
+        tqdm_holder = cli_utils.TqdmHolder(desc="Embedding documents", ncols=80)
         document_embedder.on("start", tqdm_holder.start)
         document_embedder.on("update", tqdm_holder.update)
         document_embedder.on("end", tqdm_holder.close)
@@ -132,6 +132,31 @@ def chat_command(
     from chatnerds.chat import chat
 
     chat(query=query)
+
+
+@app.command("review", help="Append a review value to the last chat log")
+def review_command(
+    review_value: Annotated[
+        Optional[int],
+        typer.Argument(
+            help="Value of the review in the range [1, 5]",
+        ),
+    ] = None,
+):
+    if not review_value:
+        review_value_response = typer.prompt(
+            "Review of the last chat iteration [1..5]",
+            type=int,
+        )
+        review_value = int(review_value_response)
+
+    if review_value < 1:
+        review_value = 1
+    elif review_value > 5:
+        review_value = 5
+
+    chat_logger = ChatLogger()
+    chat_logger.append_to_log("review", review_value)
 
 
 @app.command("env", help="Print the current value of environment variables")
