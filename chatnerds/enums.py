@@ -46,6 +46,6 @@ class SourceEnum(str, Enum):
 
 SOURCE_PATHS = {
     SourceEnum.books: "source_documents",
-    SourceEnum.youtube: "downloads/youtube",
-    SourceEnum.podcasts: "downloads/podcasts",
+    SourceEnum.youtube: "source_documents/youtube",
+    SourceEnum.podcasts: "source_documents/podcasts",
 }

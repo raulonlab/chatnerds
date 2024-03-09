@@ -24,9 +24,9 @@ SourceOption = Annotated[
 
 
 DirectoryFilterArgument = Annotated[
-    Optional[Path],
+    Optional[str],
     typer.Argument(
-        help="The relative path of the directory to be processed. Optional."
+        help="Only process directories containing the string. If not specified, process all directories."
     ),
 ]
 
@@ -37,7 +37,7 @@ UrlFilterArgument = Annotated[
 ]
 
 
-class OrderCommands(TyperGroup):
+class OrderedCommandsTyperGroup(TyperGroup):
     def list_commands(self, ctx: Context):
         """Return list of commands in the order appear."""
         return list(self.commands)  # get commands using self.commands

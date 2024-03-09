@@ -82,9 +82,19 @@ def init_nerd(nerd_name: str):
 def remove_nerd(nerd_name: str):
     logging.debug(f"Deleting nerd '{nerd_name}'")
     nerd_path = Path(_global_config.NERDS_DIRECTORY_PATH, nerd_name)
-    if not nerd_path.exists():
+    if not nerd_path or not nerd_path.exists():
         logging.error(f"Nerd '{nerd_name}' does not exist")
         return
+
+    # Prompt for confirmation
+    confirmation_response = typer.confirm(
+        f"Are you sure you want to remove the nerd files in '{nerd_path}'?",
+        default=False,
+        abort=False,
+    )
+    if not confirmation_response:
+        raise typer.Abort()
+
     shutil.rmtree(nerd_path)
     logging.info(f"Nerd '{nerd_name}' deleted")
 

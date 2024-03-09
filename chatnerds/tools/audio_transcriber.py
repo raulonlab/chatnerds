@@ -25,11 +25,10 @@ _RUN_TASKS_LIMIT = 1_000  # Maximum number of tasks to run in a single call to r
 
 
 class AudioTranscriber(EventEmitter):
-    source_directory: str
     config: Config = Optional[Config]
     summarizer: Optional[Summarizer] = None
 
-    def __init__(self, source_directory: str = ".", config: Config = None):
+    def __init__(self, config: Config = None):
         super().__init__()
 
         if config:
@@ -37,19 +36,26 @@ class AudioTranscriber(EventEmitter):
         else:
             self.config = Config.environment_instance()
 
-        self.source_directory = source_directory
-
     def run(
-        self, filter_directory: str = "", output_path: str = None
+        self,
+        source_directory: str = ".",
+        source_files: List[str] = None,
+        output_path: str = None,
+        include_filter: str = None,
     ) -> Tuple[List[str], List[any]]:
         logging.debug("Running audio transcriber...")
 
-        logging.debug("Finding existing transcript files (to skip them)...")
-        audio_files = self.find_audio_files(self.source_directory)
+        if source_files and len(source_files) > 0:
+            audio_files = source_files
+        elif source_directory:
+            logging.debug("Finding audio files in source directory...")
+            audio_files = self.find_audio_files(source_directory)
+        else:
+            raise ValueError("No audio files found")
 
         transcribe_audio_arguments = []
         for audio_file in audio_files:
-            if filter_directory and filter_directory not in audio_file:
+            if include_filter and include_filter not in audio_file:
                 continue
 
             # Get filename without ext

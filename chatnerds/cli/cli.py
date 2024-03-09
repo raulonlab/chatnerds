@@ -2,10 +2,13 @@ from typing import Optional
 from typing_extensions import Annotated
 import typer
 import logging
+from pathlib import Path
+from rich.console import Console
+from rich.syntax import Syntax
 from chatnerds.config import Config
 from chatnerds.logging_setup import setup as setup_logging
 from chatnerds.cli import cli_nerds, cli_sources, cli_tools, cli_utils, cli_db
-from chatnerds.utils import get_source_directory_paths
+from chatnerds.utils import get_filtered_directories
 from chatnerds.cli.cli_utils import TqdmHolder
 
 _global_config = Config.environment_instance()
@@ -21,7 +24,7 @@ setup_logging(
     log_file_path=_global_config.LOG_FILE_PATH,
 )
 
-app = typer.Typer(cls=cli_utils.OrderCommands)
+app = typer.Typer(cls=cli_utils.OrderedCommandsTyperGroup, no_args_is_help=True)
 
 
 # Import commands from other modules
@@ -29,24 +32,26 @@ app.registered_commands += cli_nerds.app.registered_commands
 app.registered_commands += cli_sources.app.registered_commands
 
 
-@app.command("study", help="Add source documents to embeddings DB")
+# Default command
+@app.callback(invoke_without_command=True)
+def main(ctx: typer.Context):
+    if ctx.invoked_subcommand is None:
+        app.show_help(ctx)
+
+
+@app.command(
+    "study",
+    help="Start studying (ingesting) the source documents and save the embeddings in the local DB",
+)
 def study_command(
     directory_filter: cli_utils.DirectoryFilterArgument = None,
-    source: cli_utils.SourceOption = None,
 ):
-    if not directory_filter and not source:
-        typer.echo(
-            "No directory or source specified. Please specify one of them. See chatnerds add --help."
-        )
-        raise typer.Abort()
-
     cli_utils.validate_confirm_active_nerd()
 
     try:
-        source_directories = get_source_directory_paths(
+        source_directories = get_filtered_directories(
             directory_filter=directory_filter,
-            source=source,
-            base_path=_global_config.get_nerd_base_path(),
+            base_path=Path(_global_config.get_nerd_base_path(), "source_documents"),
         )
 
         from chatnerds.document_loaders.document_loader import DocumentLoader
@@ -104,14 +109,12 @@ def study_command(
         raise typer.Abort()
 
 
-@app.command(
-    "chat", help="Start a chat session with the documents added in the embeddings DB"
-)
+@app.command("chat", help="Start an interactive chat session with your active nerd")
 def chat_command(
     query: Annotated[
         Optional[str],
         typer.Argument(
-            help="The query to use for retrieval. If not specified, runs in interactive mode."
+            help="Send a one-off query to your active nerd and exit. If not specified, runs in interactive mode."
         ),
     ] = None,
     # filter: Annotated[
@@ -131,9 +134,43 @@ def chat_command(
     chat(query=query)
 
 
-@app.command("config", help="Print runtime configuration")
+@app.command("env", help="Print the current value of environment variables")
+def env_command(
+    default: Annotated[
+        Optional[bool],
+        typer.Option(
+            "--default",
+            "-d",
+            help="Print the default value of environment variables instead of the current ones.",
+        ),
+    ] = False
+):
+
+    console = Console()
+
+    if default:
+        env_string = (
+            f"# Default environment configuration\n{str(Config.default_instance())}"
+        )
+    else:
+        env_string = f"# Current environment configuration\n{str(_global_config)}"
+
+    syntax = Syntax(env_string, "ini", line_numbers=False)  # , theme="monokai"
+    console.print(syntax)
+
+
+@app.command("config", help="Print the active nerd configuration (config.yaml)")
 def config_command():
-    print(str(_global_config))
+
+    console = Console()
+
+    config_yaml = yaml.safe_dump(
+        _global_config.get_nerd_config(), stream=None, default_flow_style=False
+    )
+    config_string = f"# Active configuration\n{config_yaml}"
+
+    syntax = Syntax(config_string, "yaml", line_numbers=False)  # , theme="monokai"
+    console.print(syntax)
 
 
 app.add_typer(
@@ -147,7 +184,7 @@ app.add_typer(
 app.add_typer(
     cli_db.app,
     name="db",
-    help="Database operations",
-    short_help="Database operations",
+    help="Other commands related with the local DB",
+    short_help="Other commands related with the local DB",
     epilog="* These commands require an active nerd environment.",
 )

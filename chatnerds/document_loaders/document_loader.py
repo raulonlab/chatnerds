@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 import glob
 import logging
 from typing import Any, Dict, List, Tuple
@@ -51,10 +52,12 @@ class DocumentLoader(EventEmitter):
     config: Dict[str, Any] = {}
     source_directories: List[str] = []
 
-    def __init__(self, nerd_config: Dict[str, Any], source_directories: List[str]):
+    def __init__(
+        self, nerd_config: Dict[str, Any], source_directories: List[str | Path]
+    ):
         super().__init__()
         self.config = nerd_config
-        self.source_directories = source_directories
+        self.source_directories = [str(directory) for directory in source_directories]
 
     def run(self) -> Tuple[List[Document], List[any]]:
         logging.debug("Running document loader...")

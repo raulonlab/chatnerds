@@ -36,7 +36,7 @@ def _get_log_header(config: Dict[str, Any]) -> str:
 def chat(query: Optional[str] = None) -> None:
     config = _global_config.get_nerd_config()
 
-    chat_chain = ChainFactory(config).get_rag_fusion_chain()
+    chat_chain = ChainFactory(config).get_chat_chain()
 
     interactive = not query
     print()

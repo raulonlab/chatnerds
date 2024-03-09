@@ -33,7 +33,7 @@ class ChainFactory:
         self.config = config
 
     # Source: https://levelup.gitconnected.com/3-query-expansion-methods-implemented-using-langchain-to-improve-your-rag-81078c1330cd
-    def get_rag_fusion_chain(self) -> Chain:
+    def get_chat_chain(self) -> Chain:
         embeddings = LLMFactory(config=self.config).get_embedding_function()
 
         chroma_database = ChromaDatabase(
@@ -46,7 +46,6 @@ class ChainFactory:
         )
 
         self.retriever = chroma_database.client.as_retriever(**self.config["retriever"])
-        retriever_k = self.retriever.search_kwargs.get("k", 4)
 
         self.llm, prompt_type = LLMFactory(config=self.config).get_llm()
 
@@ -59,21 +58,21 @@ class ChainFactory:
             llm=self.llm, system_prompt=system_prompt, prompt_type=prompt_type
         )
 
-        n_expanded_questions: int = self.config["chain"].get("n_expanded_questions", 0)
-
         retrieve_relevant_documents = RunnableParallel(
             documents={
                 "question": RunnablePassthrough(),
                 "documents": question_expansion_runnable.bind(
                     llm=self.llm,
                     prompt_type=prompt_type,
-                    n_expanded_questions=n_expanded_questions,
+                    **self.config["chat_chain"],
                 )
-                | retrieve_relevant_documents_runnable.bind(retriever=self.retriever),
+                | retrieve_relevant_documents_runnable.bind(
+                    retriever=self.retriever, **self.config["chat_chain"]
+                ),
             }
-            | rerank_documents_runnable
+            | rerank_documents_runnable.bind(**self.config["chat_chain"])
             | get_parent_documents_runnable.bind(
-                parents_db_client=parent_database.client, retriever_k=retriever_k
+                parents_db_client=parent_database.client, **self.config["chat_chain"]
             ),
             question=RunnablePassthrough(),
         )

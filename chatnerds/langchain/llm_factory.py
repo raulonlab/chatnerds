@@ -8,7 +8,6 @@ from langchain_community.embeddings import (
     HuggingFaceInstructEmbeddings,
     HuggingFaceEmbeddings,
 )
-from chatnerds.config import Config
 
 
 class LLMFactory:

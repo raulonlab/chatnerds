@@ -30,6 +30,7 @@ class Config(object):
 
     ACTIVE_NERD: Union[str, None] = None  # (Default: None) Name of the active nerd
     NERDS_DIRECTORY_PATH: str = "nerds"  # (Default: "nerds") Path to nerds directory
+    """Description of NERDS_DIRECTORY_PATH. Hahahaha"""
     LOG_FILE_LEVEL: Optional[str] = (
         None  # (Default: None) Logging level for the log file. Values: INFO, WARNING, ERROR, CRITICAL, NOTSET. If None, disable logging to file
     )
@@ -79,7 +80,7 @@ class Config(object):
     PODCAST_SHOW_PROGRESS_BAR: bool = (
         True  # (Default: True) Show a progress bar while downloading
     )
-    TEST: str = ""  # (Default: "") Test config value
+    # TEST: str = ""  # (Default: "") Test config value
 
     def __init__(self, config: dict = None):
         # ref: https://alexandra-zaharia.github.io/posts/python-configuration-and-dataclasses/
@@ -95,11 +96,11 @@ class Config(object):
                 setattr(self, config_key, config_value)
 
     def __str__(self):
-        response = "Config:\n"
+        response = ""
         for field in fields(self):
             if field.name.startswith("_"):
                 continue
-            response += f"  {field.name}: {getattr(self, field.name)}\n"
+            response += f"{field.name}={getattr(self, field.name)}\n"
         return response
 
     @classmethod

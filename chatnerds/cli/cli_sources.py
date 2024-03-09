@@ -8,20 +8,22 @@ from chatnerds.cli.cli_utils import (
     validate_confirm_active_nerd,
     TqdmHolder,
 )
-from chatnerds.utils import get_source_directory_paths
+from chatnerds.utils import get_filtered_directories, copy_files_between_directories
 from chatnerds.config import Config
+
 
 _global_config = Config.environment_instance()
 app = typer.Typer()
 
 
 @app.command(
-    "download-sources", help="Download audio files from sources (youtube and podcasts)"
+    "download-sources",
+    help="Download audio files (.mp3) of youtube and podcast sources",
 )
 def download_sources(source: SourceOption = None):
     validate_confirm_active_nerd()
 
-    # Youtube downloader
+    # Local import of YoutubeDownloader
     from chatnerds.tools.youtube_downloader import YoutubeDownloader
 
     if not source or source == SourceEnum.youtube:
@@ -45,7 +47,7 @@ def download_sources(source: SourceOption = None):
             f"{len(results)} youtube audio files downloaded successfully with {len(errors)} errors...."
         )
 
-    # Padcasts downloader
+    # Local import of PodcastDownloader
     from chatnerds.tools.podcast_downloader import PodcastDownloader
 
     if not source or source == SourceEnum.podcasts:
@@ -59,35 +61,60 @@ def download_sources(source: SourceOption = None):
         )
 
 
-@app.command("transcribe-sources", help="Transcribe audio files")
-def transcribe_sources(
+@app.command(
+    "transcribe-downloads",
+    help="Transcribe downloaded audio files into transcript files (.transcript)",
+)
+def transcribe_downloads(
     directory_filter: DirectoryFilterArgument = None,
-    source: SourceOption = None,
 ):
     validate_confirm_active_nerd()
 
-    source_directories = get_source_directory_paths(
+    source_directories = get_filtered_directories(
         directory_filter=directory_filter,
-        source=source,
-        base_path=_global_config.get_nerd_base_path(),
+        base_path=Path(_global_config.get_nerd_base_path(), "downloads"),
     )
 
-    # Audio transcriber
+    # Local import of AudioTranscriber
     from chatnerds.tools.audio_transcriber import AudioTranscriber
 
     for source_directory in source_directories:
-        audio_transcriber = AudioTranscriber(
-            source_directory=str(source_directory), config=_global_config
-        )
+        audio_transcriber = AudioTranscriber(config=_global_config)
 
         tqdm_holder = TqdmHolder(desc="Transcribing sources", ncols=80)
         audio_transcriber.on("start", tqdm_holder.start)
         audio_transcriber.on("update", tqdm_holder.update)
         audio_transcriber.on("end", tqdm_holder.close)
 
-        results, errors = audio_transcriber.run()
+        results, errors = audio_transcriber.run(source_directory=str(source_directory))
 
         tqdm_holder.close()
         logging.info(
             f"{len(results)} audios transcribed successfully with {len(errors)} errors...."
         )
+
+        logging.info("Copying transcript files to source_documents/ ....")
+
+        source_directory_relative = source_directory.relative_to(
+            Path(_global_config.get_nerd_base_path(), "downloads")
+        )
+
+        try:
+            copy_files_between_directories(
+                "**/*.transcript",
+                src_dir=Path(
+                    _global_config.get_nerd_base_path(),
+                    "downloads",
+                    source_directory_relative,
+                ),
+                dst_dir=Path(
+                    _global_config.get_nerd_base_path(),
+                    "source_documents",
+                    source_directory_relative,
+                ),
+            )
+        except Exception as e:
+            logging.error(
+                "Error moving transcript files to directory 'source_documents'",
+                exc_info=e,
+            )

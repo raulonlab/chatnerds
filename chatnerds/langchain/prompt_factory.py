@@ -89,25 +89,21 @@ class PromptFactory:
 
         return prompt
 
-    def get_query_expansion_prompt(
+    def get_question_answer_prompt(
         self,
         llm: LLMBase,
-        system_prompt=None,
-        prompt_type=None,
-        n_expanded_questions: int = 0,
+        system_prompt: str = None,
+        prompt_type: str = None,
     ):
-        formatted_system_prompt = system_prompt.format(
-            n_expanded_questions=n_expanded_questions
-        )
         prompt_selector = ConditionalPromptSelector(
-            default_prompt=self._get_query_expansion_prompt_generic(
-                system_prompt=formatted_system_prompt
+            default_prompt=self._get_question_answer_prompt_generic(
+                system_prompt=system_prompt
             ),
             conditionals=[
                 (
                     lambda llm: isinstance(llm, LlamaCpp),
-                    self._get_query_expansion_prompt_by_type(
-                        system_prompt=formatted_system_prompt, prompt_type=prompt_type
+                    self._get_question_answer_prompt_by_type(
+                        system_prompt=system_prompt, prompt_type=prompt_type
                     ),
                 )
             ],
@@ -117,7 +113,7 @@ class PromptFactory:
 
         return prompt
 
-    def _get_query_expansion_prompt_generic(self, system_prompt=None):
+    def _get_question_answer_prompt_generic(self, system_prompt=None):
         prompt_messages = []
         if system_prompt:
             prompt_messages.append(("system", system_prompt))
@@ -127,7 +123,7 @@ class PromptFactory:
 
         return prompt
 
-    def _get_query_expansion_prompt_by_type(self, system_prompt=None, prompt_type=None):
+    def _get_question_answer_prompt_by_type(self, system_prompt=None, prompt_type=None):
         prompt_parts = []
 
         if (

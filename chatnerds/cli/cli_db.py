@@ -1,6 +1,10 @@
 import typer
 from typing_extensions import Annotated
-from chatnerds.cli.cli_utils import validate_confirm_active_nerd, grep_match
+from chatnerds.cli.cli_utils import (
+    OrderedCommandsTyperGroup,
+    validate_confirm_active_nerd,
+    grep_match,
+)
 from chatnerds.langchain.chroma_database import (
     ChromaDatabase,
     DEFAULT_PARENT_CHUNKS_COLLECTION_NAME,
@@ -10,9 +14,10 @@ from chatnerds.enums import LogColors
 from chatnerds.config import Config
 
 _global_config = Config.environment_instance()
-app = typer.Typer()
+app = typer.Typer(cls=OrderedCommandsTyperGroup, no_args_is_help=True)
 
 
+# Default command: summary
 @app.callback(invoke_without_command=True)
 def main(ctx: typer.Context):
     if ctx.invoked_subcommand is None:

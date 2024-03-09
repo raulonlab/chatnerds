@@ -37,7 +37,7 @@ def question_expansion_runnable(
         n_expanded_questions=n_expanded_questions
     )
 
-    query_expansion_prompt = PromptFactory().get_query_expansion_prompt(
+    query_expansion_prompt = PromptFactory().get_question_answer_prompt(
         llm=llm, system_prompt=query_expansion_system_prompt, prompt_type=prompt_type
     )
 
@@ -61,19 +61,14 @@ def question_expansion_runnable(
 
 @chain
 def retrieve_relevant_documents_runnable(
-    questions: List[str] | str, retriever: VectorStoreRetriever
+    questions: List[str] | str, retriever: VectorStoreRetriever, **kwargs
 ) -> Runnable:
     if isinstance(questions, str):
         questions = [questions]
 
-    retriever_k = retriever.search_kwargs.get("k", 4)
-
     retrieved_documents: List[Document] = []
     for i in questions:
-        retriever.search_kwargs["k"] = 20 * retriever_k  # increase k for better results
         results = retriever.get_relevant_documents(i)
-        retriever.search_kwargs["k"] = retriever_k  # reset k
-
         retrieved_documents.extend(results)
 
     # Remove duplicates
@@ -90,10 +85,15 @@ def retrieve_relevant_documents_runnable(
 
 # Cross Encoding happens in here
 @chain
-def rerank_documents_runnable(input: Dict) -> Runnable:
+def rerank_documents_runnable(
+    input: Dict, use_cross_encoding_rerank: bool = True, **kwargs
+) -> Runnable:
 
     question: str = input.get("question", None)
     documents: List[Document] = input.get("documents", [])
+
+    if not use_cross_encoding_rerank:
+        return documents
 
     if len(documents) == 0:
         return []
@@ -120,7 +120,10 @@ def rerank_documents_runnable(input: Dict) -> Runnable:
 
 @chain
 def get_parent_documents_runnable(
-    documents: List[Document], parents_db_client: Chroma, retriever_k: int
+    documents: List[Document],
+    parents_db_client: Chroma,
+    n_combined_documents: int,
+    **kwargs,
 ) -> Runnable:
 
     if len(documents) == 0:
@@ -133,7 +136,7 @@ def get_parent_documents_runnable(
         if parent_id and parent_id not in parent_ids:
             parent_ids.append(parent_id)
 
-        if len(parent_ids) == retriever_k:
+        if len(parent_ids) == n_combined_documents:
             break
 
     parent_result = parents_db_client.get(ids=parent_ids)
@@ -147,7 +150,7 @@ def get_parent_documents_runnable(
             )
         )
 
-    return result_documents[:min(retriever_k, len(result_documents))]
+    return result_documents[: min(n_combined_documents, len(result_documents))]
 
 
 @chain

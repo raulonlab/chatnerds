@@ -108,7 +108,7 @@ class ChromaDatabase:
         self, query: str, k: int = 4, with_score: bool = False
     ) -> List[Document] | List[Tuple[Document, float]]:
         if with_score:
-            return self.client.sea.similarity_search_with_score(query, k)
+            return self.client.similarity_search_with_score(query, k)
         else:
             return self.client.similarity_search(query, k)
 

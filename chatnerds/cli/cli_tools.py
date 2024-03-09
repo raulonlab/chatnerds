@@ -1,99 +1,76 @@
 import logging
-from pathlib import Path
 from typing import Optional
 import typer
 from typing_extensions import Annotated
 from rich import print as rprint
 from rich.markup import escape
 from rich.panel import Panel
-from chatnerds.cli.cli_utils import UrlFilterArgument, validate_confirm_active_nerd
+from chatnerds.cli.cli_utils import (
+    OrderedCommandsTyperGroup,
+    UrlFilterArgument,
+    validate_confirm_active_nerd,
+)
 from chatnerds.config import Config
 
 
 _global_config = Config.environment_instance()
-app = typer.Typer()
+app = typer.Typer(cls=OrderedCommandsTyperGroup, no_args_is_help=True)
 
 
 @app.command("transcribe-youtube", help="Transcribe youtube video")
 def transcribe_youtube_command(
     url: UrlFilterArgument = None,
 ):
+    # Local import of YoutubeDownloader
     from chatnerds.tools.youtube_downloader import YoutubeDownloader
 
     youtube_downloader = YoutubeDownloader(source_urls=[url], config=_global_config)
     audio_output_file_paths = youtube_downloader.run()
 
     if len(audio_output_file_paths) == 0:
-        typer.echo(f"Unable to download audio from url: {url}")
+        logging.error(f"Unable to download audio from url: {url}")
         raise typer.Abort()
 
-    audio_output_file_path = audio_output_file_paths[0]
-    source_directory = Path(audio_output_file_path).parent
-
+    # Local import of AudioTranscriber
     from chatnerds.tools.audio_transcriber import AudioTranscriber
 
-    audio_transcriber = AudioTranscriber(
-        source_directory=str(source_directory), config=_global_config
+    audio_transcriber = AudioTranscriber(config=_global_config)
+    rprint(f"Transcribing audio file '{audio_output_file_paths[0]}'...")
+    transcript_output_file_paths = audio_transcriber.run(
+        source_files=audio_output_file_paths
     )
-    logging.info(f"Transcribing directory: {source_directory}")
-    transcript_output_file_paths = audio_transcriber.run()
 
     if len(transcript_output_file_paths) == 0:
-        typer.echo(f"Unable to transcript audio file: {audio_output_file_path}")
+        logging.error(f"Unable to transcript audio file '{audio_output_file_paths[0]}'")
         raise typer.Abort()
 
     transcript_output_file_path = transcript_output_file_paths[0]
     with open(transcript_output_file_path, "r") as transcript_file:
         transcript = transcript_file.read()
-        print(f"Transcript of youtube video {url}:\n\n{transcript}")
-
-
-@app.command("split")
-def split_command(input_file_path: str):
-    _global_config.get_nerd_config()
-
-    from chatnerds.document_loaders.transcript_loader import TranscriptLoader
-
-    try:
-        transcript_documents = TranscriptLoader(input_file_path).load()
-        print("transcript_documents: ")
-        print(transcript_documents)
-        print("#########################\n")
-
-        from chatnerds.langchain.document_embedder import DocumentEmbedder
-
-        chunks = DocumentEmbedder.split_documents(transcript_documents)
-
-        print(f"Split {input_file_path}:")
-        print("#########################")
-        for chunk in chunks:
-            print(chunk.page_content)
-            print("-----------------------------")
-
-    except Exception as e:
-        logging.error(
-            f"Error running test split with input file {input_file_path}:\n{e}"
-        )
-        raise typer.Abort()
+        rprint(f"\n[bold]Transcript of youtube video {url}:", flush=True)
+        rprint(Panel(transcript))
 
 
 @app.command("summarize")
 def summarize_command(input_file_path: str):
     nerd_config = _global_config.get_nerd_config()
 
+    # Local import of TranscriptLoader
     from chatnerds.document_loaders.transcript_loader import TranscriptLoader
 
     try:
         transcript_documents = TranscriptLoader(input_file_path).load()
 
+        # Local import of Summarizer
         from chatnerds.langchain.summarizer import Summarizer
 
         summarizer = Summarizer(nerd_config)
+
+        rprint(f"Summarizing file '{input_file_path}'...")
         summary = summarizer.summarize_text(transcript_documents[0].page_content)
 
-        print(f"Summarize {input_file_path}:")
-        print("#########################")
-        print(summary)
+        rprint(f"\n[bold]Summary of '{input_file_path}':", flush=True)
+        rprint(Panel(summary))
 
     except Exception as e:
         logging.error(
@@ -116,29 +93,30 @@ def search_command(
     validate_confirm_active_nerd(skip_confirmation=True)
 
     interactive = not query
-    print()
     if interactive:
-        print("Type your query below and press Enter.")
-        print("Type 'exit' or 'quit' or 'q' to exit the application.\n")
+        rprint("\nType your query below and press Enter.")
+        rprint("Type 'exit' or 'quit' or 'q' to exit the application.\n")
 
-    print("[bold]Q: ", end="", flush=True)
+    rprint("[bold]Q: ", flush=True)
     if interactive:
         query = input()
     else:
-        print(escape(query))
-    print()
+        rprint(escape(query))
+    rprint()
     if query.strip() in ["exit", "quit", "q"]:
-        print("Exiting...\n")
+        rprint("Exiting...\n")
         return
 
-    print("Searching...\n", end="", flush=True)
+    rprint("Searching...\n", flush=True)
 
     nerd_config = _global_config.get_nerd_config()
 
+    # Local import of LLMFactory
     from chatnerds.langchain.llm_factory import LLMFactory
 
     embeddings = LLMFactory(config=nerd_config).get_embedding_function()
 
+    # Local import of ChromaDatabase
     from chatnerds.langchain.chroma_database import ChromaDatabase
 
     database = ChromaDatabase(embeddings=embeddings, config=nerd_config["chroma"])
@@ -150,7 +128,7 @@ def search_command(
     )
 
     # Add score to metadata
-    rprint("\n[bold]Similar documents found:", end="", flush=True)
+    rprint("\n[bold]Similar documents found:", flush=True)
     for doc, score in similar_chunks:
         doc.metadata["score"] = score
         rprint(

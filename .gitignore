@@ -2,6 +2,7 @@
 nerds/
 logs/
 notes*.md
+*.excalidraw
 .vscode/
 .DS_Store
 
