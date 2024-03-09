@@ -148,7 +148,7 @@ Documents already processed and stored in the database are skipped
 
 ### Chat
 
-![Chat chain diagram](docs/chat_chain.png)
+![Chat chain diagram](docs/chat-chain.png)
 
 Start chatting with your active nerd in interactive mode:
 ```bash
