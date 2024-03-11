@@ -11,7 +11,7 @@ import whisper
 import music_tag
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from chatnerds.config import Config
-from chatnerds.utils import check_for_package
+from chatnerds.utils import check_for_package, TimeTaken
 from chatnerds.langchain.summarizer import Summarizer
 from chatnerds.tools.event_emitter import EventEmitter
 
@@ -42,6 +42,7 @@ class AudioTranscriber(EventEmitter):
         source_files: List[str] = None,
         output_path: str = None,
         include_filter: str = None,
+        force: bool = False,
     ) -> Tuple[List[str], List[any]]:
         logging.debug("Running audio transcriber...")
 
@@ -74,7 +75,7 @@ class AudioTranscriber(EventEmitter):
                     f"{input_audio_file_without_ext}.transcript",
                 )
 
-            if os.path.exists(transcript_file_path):
+            if not force and os.path.exists(transcript_file_path):
                 continue
 
             transcribe_audio_arguments.append(
@@ -133,14 +134,18 @@ class AudioTranscriber(EventEmitter):
         transcript_file_path = input_arguments["transcript_file_path"]
         model_name = input_arguments["model_name"]
 
-        if check_for_package("whisper_mps"):
-            transcript = AudioTranscriber.transcribe_audio_using_mps(
-                input_audio_file_path=input_audio_file_path, model_name=model_name
-            )
+        if AudioTranscriber.check_device() == "mps" and check_for_package(
+            "whisper_mps"
+        ):
+            with TimeTaken(f"Transcribing audio with model '{model_name}' using MPS"):
+                transcript = AudioTranscriber.transcribe_audio_using_mps(
+                    input_audio_file_path=input_audio_file_path, model_name=model_name
+                )
         else:
-            transcript = AudioTranscriber.transcribe_audio_using_cpu(
-                input_audio_file_path=input_audio_file_path, model_name=model_name
-            )
+            with TimeTaken(f"Transcribing audio with model '{model_name}' using CPU"):
+                transcript = AudioTranscriber.transcribe_audio_using_cpu(
+                    input_audio_file_path=input_audio_file_path, model_name=model_name
+                )
 
         audio_file_tags = AudioTranscriber.read_audio_file_tags(
             str(input_audio_file_path)
@@ -163,12 +168,19 @@ class AudioTranscriber(EventEmitter):
 
         """Load speech recognition model."""
         logging.debug(f"Loading model '{model_name}'...")
-        model = whisper.load_model(model_name, device=AudioTranscriber.check_device())
+
+        # Whisper doesn't support MPS devices
+        device = AudioTranscriber.check_device()
+        if device != "cuda" and device != "cpu":
+            device = "cpu"
+        model = whisper.load_model(model_name, device=device)
 
         logging.debug(
             f"Transcribing audio using CPU / GPU (No MPS): '{input_audio_file_path}' ..."
         )
-        result = model.transcribe(input_audio_file_path)
+        result = model.transcribe(
+            input_audio_file_path,
+        )
 
         # Free memory?
         model = None
@@ -217,12 +229,8 @@ class AudioTranscriber(EventEmitter):
     def check_device():
         """Check CUDA availability."""
         if torch.cuda.is_available() == 1:
-            logging.debug("Using CUDA")
-            device = "cuda"
-        # elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
-        #     logging.debug("Using MPS")
-        #     device = "mps"
+            return "cuda"
+        elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+            return "mps"
         else:
-            logging.debug("Using CPU")
-            device = "cpu"
-        return device
+            return "cpu"

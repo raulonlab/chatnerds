@@ -51,6 +51,33 @@ def transcribe_youtube_command(
         rprint(Panel(transcript))
 
 
+@app.command("transcribe-audio", help="Transcribe mp3 audio file")
+def transcribe_audio_command(
+    input_file_path: str,
+    output_path: Optional[str] = None,
+):
+    # Local import of AudioTranscriber
+    from chatnerds.tools.audio_transcriber import AudioTranscriber
+
+    audio_transcriber = AudioTranscriber(config=_global_config)
+    rprint(f"Transcribing audio file '{input_file_path}'...")
+    results, errors = audio_transcriber.run(
+        source_files=[input_file_path],
+        output_path=output_path,
+        force=True,
+    )
+
+    if len(errors) > 0:
+        logging.error("Error transcribing audio file", exc_info=errors[0])
+        raise typer.Abort()
+
+    transcript_output_file_path = results[0]
+    with open(transcript_output_file_path, "r") as transcript_file:
+        transcript = transcript_file.read()
+        rprint(f"\n[bold]Transcript of audio file '{input_file_path}':", flush=True)
+        rprint(Panel(transcript))
+
+
 @app.command("summarize")
 def summarize_command(input_file_path: str):
     nerd_config = _global_config.get_nerd_config()
