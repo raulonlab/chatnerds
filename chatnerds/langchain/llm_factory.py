@@ -45,11 +45,18 @@ class LLMFactory:
         device_type = self.config["device_type"] or "cpu"
         selected_llm = self.config["llm"]
 
-        if selected_llm not in self.config:
-            raise ValueError(f"LLM config '{selected_llm}' not found in config file.")
+        # Load selected LLM config from the list of llms in config file
+        selected_llm_config = self.config.get("llms", {}).get(selected_llm, None)
 
-        selected_llm_config = dict(self.config[selected_llm])
-
+        # Or load selected LLM config from the root of config file
+        if not selected_llm_config:
+            selected_llm_config = self.config.get(selected_llm, None)
+        
+        if not selected_llm_config:
+            raise ValueError(f"LLM preset '{selected_llm}' not found in config file")
+        elif not isinstance(selected_llm_config, dict):
+            raise ValueError(f"LLM preset '{selected_llm}' is not a valid dictionary")
+        
         llm_provider = selected_llm_config.pop("provider", "llamacpp")
         prompt_type = selected_llm_config.pop("prompt_type", None)
 
@@ -190,7 +197,7 @@ class LLMFactory:
             )
 
             if device_type.lower() == "mps":
-                kwargs["n_gpu_layers"] = 1
+                # kwargs["n_gpu_layers"] = 1
                 kwargs["f16_kv"] = (
                     True  # MUST set to True, otherwise you will run into problem after a couple of calls
                 )

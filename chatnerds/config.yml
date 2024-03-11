@@ -1,17 +1,19 @@
-system_prompt: Use the following pieces of context to answer the question at the end. If you don't know the answer, just say that you don't know, don't try to make up an answer.
-use_history: false
-device_type: cpu    # (default: mps) Select device type: cuda, mps, cpu
+system_prompt: >
+  Use the following pieces of context to answer the question at the end. 
+  If you don't know the answer, just say that you don't know, don't try to make up an answer.
+use_history: false  # Adding history to conversations is WIP
+device_type: cpu    # (default: cpu) Select device type: cuda, mps, cpu
 summarize_chain_type: "stuff"  # (default: stuff) Select summarization chain type: stuff, map_reduce, refine
 
 embeddings:
   model_name: hkunlp/instructor-large
   # model_kwargs:
-  #   device: mps
+  #   device: mps  # mps is not available yet in HuggingFace embeddings
 
-llm: mistral01_gguf
+llm: mistral01_gguf  # Select the key of one of the available presets in 'llms'
 
 splitter:
-  chunk_size: 1000  # (default: 1000) Maximum number of tokens per chunk.
+  chunk_size: 1000  # (default: 1000) Maximum number of tokens per chunk or model max_seq_length if larger
   chunk_overlap: 100  # (default: 100) Number of tokens to overlap between chunks.
   # keep_separator: false  # (default: false) Keep the separator token at the end of each chunk.
 
@@ -33,122 +35,132 @@ chroma:
   is_persistent: true
   anonymized_telemetry: false
 
-# LLM Models
-gpt-3.5-turbo:
-  provider: openai
-  model_name: gpt-3.5-turbo
-  temperature: 0.2
-  # top_p: 0.95
-  # max_tokens: 4096
-  # verbose: false
-
-ollama-llama2:
-  provider: ollama
-  model: llama2-uncensored:7b-chat-q4_K_M
-  temperature: 0.5  # Default: 0.8
-  # top_p: 0.5  # Default: 0.9
-  num_ctx: 16000  # 8192  # Default: 2048
-  # verbose: false
-
-ollama-mistral-instruct:
-  provider: ollama
-  model: mistral:instruct
-  temperature: 0.2  # Default: 0.8
-  # top_p: 0.5  # Default: 0.9
-  num_ctx: 8192  # 8192  # Default: 2048
-  # verbose: false
-
-# https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.2-GGUF
-mistral02_gguf:
-  prompt_type: mistral
-  model_id: TheBloke/Mistral-7B-Instruct-v0.2-GGUF
-  model_basename: mistral-7b-instruct-v0.2.Q4_K_M.gguf
-
-  # https://github.com/langchain-ai/langchain/blob/master/libs/langchain/langchain/llms/llamacpp.py
-  # llamacpp kwargs
-  temperature: 0.2  # Default: 0.8
-  # top_p: 0.5  # Default: 0.9
-  n_ctx: 8192 # https://medium.com/@mne/run-mistral-7b-model-on-macbook-m1-pro-with-16gb-ram-using-llama-cpp-44134694b773
-  max_tokens: 4096
-  n_batch: 512  # Should be between 1 and n_ctx, set this based on your GPU & CPU RAM
-  # n_threads: 7
-  n_gpu_layers: 1 # 130
-  verbose: false
-  # seed: 42
-
-mistral01_gguf:
-  prompt_type: mistral
-  model_id: TheBloke/Mistral-7B-Instruct-v0.1-GGUF
-  model_basename: mistral-7b-instruct-v0.1.Q4_K_M.gguf
-  temperature: 0.2
-  # top_p: 0.95
-  n_ctx: 16000
-  max_tokens: 4096
-  n_batch: 512  # 512 (Default: 8) set this based on your GPU & CPU RAM
-  n_gpu_layers: 1
-
-speechless_wizard_gguf:
-  model_id: TheBloke/Speechless-Llama2-Hermes-Orca-Platypus-WizardLM-13B-GGUF
-  model_basename: speechless-llama2-hermes-orca-platypus-wizardlm-13b.Q4_K_M.gguf
-
-  # llamacpp kwargs
-  temperature: 0.2
-  top_p: 0.95
-  n_ctx: 8192
-  max_tokens: 4096
-  n_batch: 512  # set this based on your GPU & CPU RAM
-  n_gpu_layers: 1
-
-wizard_gguf:
-  prompt_type: llama
-  model_id: TheBloke/WizardLM-7B-uncensored-GGUF
-  model_basename: WizardLM-7B-uncensored.Q4_K_M.gguf
-  # https://github.com/ggerganov/llama.cpp/blob/master/examples/main/README.md
-  # llamacpp kwargs
-  temperature: 0.2  # Default: 0.8
-  top_p: 0.5  # Default: 0.9
-  n_ctx: 8192
-  max_tokens: 4096
-  n_batch: 1024  # set this based on your GPU & CPU RAM
-  n_gpu_layers: 1
-
-vicuna_7b_gguf:
-  prompt_type: llama
-  model_id: TheBloke/Wizard-Vicuna-7B-Uncensored-GGUF
-  model_basename: Wizard-Vicuna-7B-Uncensored.Q4_K_M.gguf
-  temperature: 0.2
-  top_p: 0.95
-  n_ctx: 8192
-  max_tokens: 4096
-  n_batch: 512  # 512 set this based on your GPU & CPU RAM
-  n_gpu_layers: 1
-
-# https://artificialcorner.com/run-mistral7b-quantized-for-free-on-any-computer-2cadc18b45a2
-# https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.1-GPTQ#how-to-use-this-gptq-model-from-python-code
-mistral_gptq:
-  model_id: TheBloke/Mistral-7B-Instruct-v0.1-GPTQ
-  model_basename: model.safetensors
-  # temperature: 0.2
-  # n_ctx: 4096
-  # max_tokens: 4096
-  # top_p: 0.95
-  # n_batch: 512  # set this based on your GPU & CPU RAM
-  # n_gpu_layers: 32
-
-wizard_gptq:
-  model_id: TheBloke/Wizard-Vicuna-7B-Uncensored-GPTQ
-  model_basename: model.safetensors 
-
-huggingface_hf:
-  model_id: TheBloke/Wizard-Vicuna-7B-Uncensored-HF
-  model_basename: WizardLM-7B-uncensored.Q4_K_M.gguf
-  model_kwargs:
+# LLM presets
+llms:
+  gpt-3.5-turbo:
+    provider: openai
+    model_name: gpt-3.5-turbo
     temperature: 0.2
-    n_ctx: 4096
-    max_tokens: 4096
+    # top_p: 0.95
+    # max_tokens: 4096
+    # verbose: false
+
+  ollama-llama2:
+    provider: ollama
+    model: llama2-uncensored:7b-chat-q4_K_M
+    temperature: 0.5  # Default: 0.8
+    # top_p: 0.5  # Default: 0.9
+    num_ctx: 16000  # 8192  # Default: 2048
+    # verbose: false
+
+  ollama-mistral-instruct:
+    provider: ollama
+    model: mistral:instruct
+    temperature: 0.2  # Default: 0.8
+    # top_p: 0.5  # Default: 0.9
+    num_ctx: 8192  # 8192  # Default: 2048
+    # verbose: false
+
+  lmstudio_local_server:
+    provider: openai
+    model_name: local_model
+    base_url: http://localhost:1234/v1
+    temperature: 0.2
+    # top_p: 0.95
+    # max_tokens: 4096
+    # verbose: false
+
+  # https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.2-GGUF
+  mistral02_gguf:
+    prompt_type: mistral
+    model_id: TheBloke/Mistral-7B-Instruct-v0.2-GGUF
+    model_basename: mistral-7b-instruct-v0.2.Q4_K_M.gguf
+
+    # https://github.com/langchain-ai/langchain/blob/master/libs/langchain/langchain/llms/llamacpp.py
+    # llamacpp kwargs
+    temperature: 0.2  # Default: 0.8
+    # top_p: 0.5  # Default: 0.9
+    n_ctx: 8192 # https://medium.com/@mne/run-mistral-7b-model-on-macbook-m1-pro-with-16gb-ram-using-llama-cpp-44134694b773
+    max_tokens: 8192
+    n_batch: 512  # Should be between 1 and n_ctx, set this based on your GPU & CPU RAM
+    # n_threads: 7
+    n_gpu_layers: 1 # 130
+    verbose: false
+    # seed: 42
+
+  mistral01_gguf:
+    prompt_type: mistral
+    model_id: TheBloke/Mistral-7B-Instruct-v0.1-GGUF
+    model_basename: mistral-7b-instruct-v0.1.Q4_K_M.gguf
+    temperature: 0.2
+    # top_p: 0.95
+    n_ctx: 8192  # 16000
+    max_tokens: 8192  # 4096
+    n_batch: 1024  # 512 (Default: 8) set this based on your GPU & CPU RAM
+    n_gpu_layers: -1
+
+  speechless_wizard_gguf:
+    model_id: TheBloke/Speechless-Llama2-Hermes-Orca-Platypus-WizardLM-13B-GGUF
+    model_basename: speechless-llama2-hermes-orca-platypus-wizardlm-13b.Q4_K_M.gguf
+
+    # llamacpp kwargs
+    temperature: 0.2
     top_p: 0.95
+    n_ctx: 8192
+    max_tokens: 4096
     n_batch: 512  # set this based on your GPU & CPU RAM
-    n_gpu_layers: 32
-    local_files_only: false
-  pipeline_kwargs:
-    max_new_tokens: 4096
+    n_gpu_layers: 1
+
+  wizard_gguf:
+    prompt_type: llama
+    model_id: TheBloke/WizardLM-7B-uncensored-GGUF
+    model_basename: WizardLM-7B-uncensored.Q4_K_M.gguf
+    # https://github.com/ggerganov/llama.cpp/blob/master/examples/main/README.md
+    # llamacpp kwargs
+    temperature: 0.2  # Default: 0.8
+    top_p: 0.5  # Default: 0.9
+    n_ctx: 8192
+    max_tokens: 4096
+    n_batch: 1024  # set this based on your GPU & CPU RAM
+    n_gpu_layers: 1
+
+  vicuna_7b_gguf:
+    prompt_type: llama
+    model_id: TheBloke/Wizard-Vicuna-7B-Uncensored-GGUF
+    model_basename: Wizard-Vicuna-7B-Uncensored.Q4_K_M.gguf
+    temperature: 0.2
+    top_p: 0.95
+    n_ctx: 8192
+    max_tokens: 4096
+    n_batch: 512  # 512 set this based on your GPU & CPU RAM
+    n_gpu_layers: 1
+
+  # https://artificialcorner.com/run-mistral7b-quantized-for-free-on-any-computer-2cadc18b45a2
+  # https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.1-GPTQ#how-to-use-this-gptq-model-from-python-code
+  mistral_gptq:
+    model_id: TheBloke/Mistral-7B-Instruct-v0.1-GPTQ
+    model_basename: model.safetensors
+    # temperature: 0.2
+    # n_ctx: 4096
+    # max_tokens: 4096
+    # top_p: 0.95
+    # n_batch: 512  # set this based on your GPU & CPU RAM
+    # n_gpu_layers: 32
+
+  wizard_gptq:
+    model_id: TheBloke/Wizard-Vicuna-7B-Uncensored-GPTQ
+    model_basename: model.safetensors 
+
+  huggingface_hf:
+    model_id: TheBloke/Wizard-Vicuna-7B-Uncensored-HF
+    model_basename: WizardLM-7B-uncensored.Q4_K_M.gguf
+    model_kwargs:
+      temperature: 0.2
+      n_ctx: 4096
+      max_tokens: 4096
+      top_p: 0.95
+      n_batch: 512  # set this based on your GPU & CPU RAM
+      n_gpu_layers: 32
+      local_files_only: false
+    pipeline_kwargs:
+      max_new_tokens: 4096
