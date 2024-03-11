@@ -131,7 +131,7 @@ def rename_nerd(nerd_name: str, new_nerd_name: str):
 
 @app.command(
     "activate",
-    help="Activate a nerd. All subsequent commands like chat, study, etc. will use the active nerd's sources and documents.",
+    help="Activate a nerd. All subsequent commands like chat, study, etc. will use the active nerd configuration and source documents.",
 )
 def activate_nerd(nerd_name: str):
     logging.debug(f"Activating nerd '{nerd_name}'")
