@@ -11,35 +11,36 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = ">=3.10,<3.12"
-langchain = "==0.1.5"
-langchain-community = "==0.0.17"
-llama-cpp-python = ">=0.2.38"
-chromadb = "==0.4.20"
+langchain = ">=0.1.5,<0.2.0"
+langchain-community = ">=0.0.17,<0.1.0"
+llama-cpp-python = "==0.2.56"
+chromadb = ">=0.4.20"
 InstructorEmbedding = ">=1.0.1,<2.0.0"
-sentence-transformers = "==2.2.2"
+sentence-transformers = "==2.2.2"  # Breaking changes in >2.2.2
 huggingface_hub = ">=0.20.3"
 transformers = ">=4.37.2"
-auto-gptq = "==0.2.2"
-accelerate = "*"
+auto-gptq = "==0.2.2"  # ????????????
+accelerate = "^0.27.2"
 openai = ">=1.11.1"
 # openai-whisper = "==20231117"
 openai-whisper = {git = "https://github.com/openai/whisper.git", tag = "v20231117"}
+# whisper-mps = { version = "^0.0.7", python = ">=3.11" }
 typing-extensions = ">=4.4.0,<5.0.0"
-python-dotenv = ">=0.19.2"
+python-dotenv = "^0.19.2"
 typer = {extras = ["all"], version = ">=0.9.0,<1.0.0"}
 tqdm = ">=4.64.1,<5.0.0"
-rich = ">=13.0.1"
-requests = "==2.31.0"
-optimum = ">=1.12.0"
+rich = "^13.0.1"
+requests = "^2.31.0"
+optimum = "^1.12.0"
 deepmerge = ">=1.1.0,<2.0.0"
-pyyaml = ">=6.0"
+pyyaml = "^6.0"
 pytubefix = "^1.13"
-feedparser = "==6.0.10"
+feedparser = "^6.0.10"
 music-tag = "*"
 pdfminer-six = "^20231228"
 unstructured = {extras = ["all-docs"], version = "^0.12.5"}
 langchain-openai = "^0.0.6"
-simsimd = ">=3.7.7,<3.8"
+simsimd = ">=3.7.7,<3.8"  # Breaking changes in >3.8
 tiktoken = ">=0.3.3,<1"
 pandoc = "^2.3"
 

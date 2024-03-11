@@ -1,6 +1,7 @@
 # Custom
 nerds/
 logs/
+_notes/
 notes*.md
 *.excalidraw
 .vscode/

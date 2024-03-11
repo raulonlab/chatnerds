@@ -4,8 +4,8 @@
 ## Dependencies
 ### Install dependencies for MacOS (Metal device)
 install-metal:
-	CMAKE_ARGS="-DLLAMA_METAL=on" FORCE_CMAKE=1 pip install --upgrade --force-reinstall llama-cpp-python>=2.38.0 --no-cache-dir
-#	CMAKE_ARGS="-DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_APPLE_SILICON_PROCESSOR=arm64 -DLLAMA_METAL=on" pip install --upgrade --verbose --force-reinstall --no-cache-dir llama-cpp-python
+#	CMAKE_ARGS="-DLLAMA_METAL=on" FORCE_CMAKE=1 pip install --upgrade --force-reinstall --no-cache-dir llama-cpp-python 
+	CMAKE_ARGS="-DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_APPLE_SILICON_PROCESSOR=arm64 -DLLAMA_METAL=on" pip install --upgrade --force-reinstall --no-cache-dir llama-cpp-python
 
 ## Poetry commands
 ### Export requirements.txt and requirements-dev.txt
