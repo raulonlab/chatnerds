@@ -96,7 +96,7 @@ class ChatLogger:
         if nerd_config.get("llm"):
             result_string += f"{line_prefix}llm: {nerd_config['llm']}\n"
         if nerd_config.get("retriever"):
-            result_string += "{line_prefix}retriever:\n"
+            result_string += f"{line_prefix}retriever:\n"
             result_string += f"  {line_prefix}search_type: {nerd_config['retriever']['search_type']}\n"
             result_string += f"  {line_prefix}search_kwargs: {nerd_config['retriever']['search_kwargs']}\n"
         if nerd_config.get("chat_chain"):

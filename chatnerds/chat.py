@@ -1,3 +1,4 @@
+import os
 from typing import Dict, Optional
 from rich import print
 from rich.markup import escape
@@ -39,24 +40,28 @@ def chat(query: Optional[str] = None) -> None:
         if _global_config.VERBOSE > 1:
             callbacks.append(ConsoleCallbackHandler())
 
-        res = chat_chain.invoke(query, config={"callbacks": callbacks})
+        output = chat_chain.invoke(query, config={"callbacks": callbacks})
 
-        if isinstance(res, Dict) and "result" in res:
-            print()
-            if "source_documents" in res:
-                for doc in res["source_documents"]:
-                    source, content = doc.metadata["source"], doc.page_content
-                    print(
-                        Panel(
-                            f"[bright_blue]{escape(source)}[/bright_blue]\n\n{escape(content)}"
-                        )
-                    )
-
-                print()
-
-            chat_logger.log(query, res["result"], res.get("source_documents", []))
+        if isinstance(output, Dict) and "result" in output:
+            response_string = output.get("result", "")
+            source_documents = output.get("source_documents", [])
         else:
-            chat_logger.log(query, res)
+            response_string = output
+            source_documents = []
+
+        print(f"[bright_cyan]{escape(response_string)}[/bright_cyan]\n")
+        nerd_base_path = _global_config.get_nerd_base_path()
+        for doc in source_documents:
+            source, content = doc.metadata["source"], doc.page_content
+            relative_source = os.path.relpath(source, nerd_base_path)
+            print(
+                Panel(
+                    f"[bright_blue]...{escape(relative_source)}[/bright_blue]\n\n{escape(content)}"
+                )
+            )
+        print()
+
+        chat_logger.log(query, response_string, source_documents)
 
         if not interactive:
             break
