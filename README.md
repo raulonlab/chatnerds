@@ -167,6 +167,11 @@ chatnerds chat "..."
 
 ### Nerd configuration
 
+Print the active nerd configuration:
+```bash
+chatnerds config
+```
+
 The file `config.yml` in the nerd directory allows to override the default model settings used by the nerd. See the default configuration (with annotations) in [chatnerds/config.yml](chatnerds/config.yml). The new configuration is applied on every command. 
 
 > Note that changing some of the configuration, like `embeddings` and `chroma`, will invalidate the current embeddings added in the database. To fix it, delete the directory `./nerds/nerd_name/db` and start again
