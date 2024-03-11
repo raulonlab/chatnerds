@@ -42,9 +42,9 @@ Usage: chatnerds [OPTIONS] COMMAND [ARGS]...
 │                       and documents                                             │
 │ remove                Remove an existing nerd                                   │
 │ rename                Rename an existing nerd                                   │
-│ activate              Activate a nerd. All subsequent commands like chat,       │
-│                       study, etc. will use the active nerd's sources and        │
-│                       documents.                                                │
+│ activate              Activate a nerd. All subsequent commands like study,      │
+│                       chat, etc. will use the active nerd configuration and     │
+│                       source documents.                                         │
 │ list                  List all available nerds                                  │
 │ download-sources      Download audio files (.mp3) of youtube and podcast        │
 │                       sources                                                   │
@@ -167,9 +167,9 @@ chatnerds chat "..."
 
 > The first time using a new LLM model, it will download the model files and might take a while
 
-The LLM used for completion can be set in the `config.yml` of the nerd. See more details about the nerd config in next sections. The default model is `mistral01_gguf`:
+The LLM used for completion can be set in the `config.yml` of the nerd. See more details about the nerd config in next sections. The default model is `mistral-7b-instruct-v0.1-gguf`:
 ```
-mistral01_gguf:
+mistral-7b-instruct-v0.1-gguf:
   provider: llamacpp
   prompt_type: mistral
   model_id: TheBloke/Mistral-7B-Instruct-v0.1-GGUF
