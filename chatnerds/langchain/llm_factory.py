@@ -42,8 +42,20 @@ class LLMFactory:
         #         callback(token)
 
         # callbacks = [CallbackHandler()] if callback else None
-        device_type = self.config["device_type"] or "cpu"
-        selected_llm = self.config["llm"]
+        device_type = self.config.get("device_type", "cpu")
+        selected_llm = self.config.get("llm", None)
+
+        if not selected_llm:
+            raise ValueError("Selected LLM preset key 'llm:' not found in config file")
+        elif isinstance(selected_llm, list) and len(selected_llm) > 0:
+            selected_llm = str(selected_llm[0]).strip()
+        elif isinstance(selected_llm, str) and len(selected_llm.strip()) > 0:
+            selected_llm = selected_llm.strip()
+        else:
+            selected_llm = str(selected_llm).strip()
+            logging.warning(
+                f"Unexpected value type '{selected_llm}' for key 'llm' in config file. Continue anyway..."
+            )
 
         # Load selected LLM config from the list of llms in config file
         selected_llm_config = self.config.get("llms", {}).get(selected_llm, None)
