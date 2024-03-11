@@ -5,20 +5,20 @@ import typer
 from typer.core import TyperGroup
 from click import Context
 from tqdm import tqdm
-from chatnerds.enums import SourceEnum, LogColors
+from chatnerds.enums import DownloadSourceEnum, LogColors
 from chatnerds.config import Config
 
 
 _global_config = Config.environment_instance()
 
 
-SourceOption = Annotated[
-    Optional[SourceEnum],
+DownloadSourceOption = Annotated[
+    Optional[DownloadSourceEnum],
     typer.Option(
         "--source",
         "-s",
         case_sensitive=False,
-        help="The source to be processed: books, youtube, podcasts. If not specified, process all sources.",
+        help="The source to download: youtube or podcasts. If not specified, process all sources.",
     ),
 ]
 
@@ -34,6 +34,16 @@ DirectoryFilterArgument = Annotated[
 UrlFilterArgument = Annotated[
     str,
     typer.Argument(help="Url of Youtube video"),
+]
+
+
+DryRunOption = Annotated[
+    Optional[bool],
+    typer.Option(
+        "--dry-run",
+        "-d",
+        help="Run command in dry mode (get the expected response without running the task)",
+    ),
 ]
 
 

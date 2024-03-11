@@ -43,6 +43,7 @@ class AudioTranscriber(EventEmitter):
         output_path: str = None,
         include_filter: str = None,
         force: bool = False,
+        dry_run: bool = False,
     ) -> Tuple[List[str], List[any]]:
         logging.debug("Running audio transcriber...")
 
@@ -85,6 +86,13 @@ class AudioTranscriber(EventEmitter):
                     "model_name": self.config.WHISPER_TRANSCRIPTION_MODEL_NAME,
                 }
             )
+
+        # Return dry run result
+        if dry_run == True:
+            return [
+                argument["transcript_file_path"]
+                for argument in transcribe_audio_arguments
+            ], []
 
         # Return if no audio files to transcribe
         if len(transcribe_audio_arguments) == 0:

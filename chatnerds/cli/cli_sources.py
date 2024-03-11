@@ -1,10 +1,11 @@
 import logging
 import typer
 from pathlib import Path
-from chatnerds.enums import SourceEnum
+from chatnerds.enums import DownloadSourceEnum
 from chatnerds.cli.cli_utils import (
-    SourceOption,
+    DownloadSourceOption,
     DirectoryFilterArgument,
+    DryRunOption,
     validate_confirm_active_nerd,
     TqdmHolder,
 )
@@ -20,13 +21,13 @@ app = typer.Typer()
     "download-sources",
     help="Download audio files (.mp3) of youtube and podcast sources",
 )
-def download_sources(source: SourceOption = None):
+def download_sources(source: DownloadSourceOption = None):
     validate_confirm_active_nerd()
 
     # Local import of YoutubeDownloader
     from chatnerds.tools.youtube_downloader import YoutubeDownloader
 
-    if not source or source == SourceEnum.youtube:
+    if not source or source == DownloadSourceEnum.youtube:
         youtube_downloader = YoutubeDownloader(
             source_urls=_global_config.get_nerd_youtube_sources(), config=_global_config
         )
@@ -50,7 +51,7 @@ def download_sources(source: SourceOption = None):
     # Local import of PodcastDownloader
     from chatnerds.tools.podcast_downloader import PodcastDownloader
 
-    if not source or source == SourceEnum.podcasts:
+    if not source or source == DownloadSourceEnum.podcasts:
         podcast_downloader = PodcastDownloader(
             feeds=_global_config.get_nerd_podcast_sources(), config=_global_config
         )
@@ -67,6 +68,7 @@ def download_sources(source: SourceOption = None):
 )
 def transcribe_downloads(
     directory_filter: DirectoryFilterArgument = None,
+    dry_run: DryRunOption = False,
 ):
     validate_confirm_active_nerd()
 
@@ -86,12 +88,17 @@ def transcribe_downloads(
         audio_transcriber.on("update", tqdm_holder.update)
         audio_transcriber.on("end", tqdm_holder.close)
 
-        results, errors = audio_transcriber.run(source_directory=str(source_directory))
+        results, errors = audio_transcriber.run(
+            source_directory=str(source_directory), dry_run=dry_run
+        )
 
         tqdm_holder.close()
         logging.info(
-            f"{len(results)} audios transcribed successfully with {len(errors)} errors...."
+            f"{'[Dry run] ' if dry_run else ''}{len(results)} audios transcribed successfully with {len(errors)} errors...."
         )
+
+        if dry_run == True:
+            return
 
         logging.info("Copying transcript files to source_documents/ ....")
 
