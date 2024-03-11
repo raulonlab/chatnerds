@@ -2,6 +2,7 @@ from typing import Optional
 from typing_extensions import Annotated
 import typer
 import logging
+import yaml
 from pathlib import Path
 from rich.console import Console
 from rich.syntax import Syntax
@@ -117,15 +118,6 @@ def chat_command(
             help="Send a one-off query to your active nerd and exit. If not specified, runs in interactive mode."
         ),
     ] = None,
-    # filter: Annotated[
-    #     Optional[str],
-    #     typer.Option(
-    #         "--filter",
-    #         "-f",
-    #         case_sensitive=False,
-    #         help="Filter source documents by a string",
-    #     ),
-    # ] = None,
 ):
     cli_utils.validate_confirm_active_nerd()
 
@@ -173,28 +165,46 @@ def env_command(
 
     console = Console()
 
-    if default:
-        env_string = (
-            f"# Default environment configuration\n{str(Config.default_instance())}"
-        )
-    else:
-        env_string = f"# Current environment configuration\n{str(_global_config)}"
-
-    syntax = Syntax(env_string, "ini", line_numbers=False)  # , theme="monokai"
+    syntax = Syntax(
+        "\n".join(
+            [
+                (
+                    "# Default environment variables"
+                    if default
+                    else "# Current environment variables"
+                ),
+                "# See more info in https://github.com/raulonlab/chatnerds/blob/main/chatnerds/config.yml",
+                str(Config.default_instance()) if default else str(_global_config),
+            ]
+        ),
+        "ini",
+        line_numbers=False,
+    )  # , theme="monokai"
     console.print(syntax)
 
 
-@app.command("config", help="Print the active nerd configuration (config.yaml)")
+@app.command("config", help="Print the active nerd configuration (config.yml)")
 def config_command():
 
     console = Console()
 
     config_yaml = yaml.safe_dump(
-        _global_config.get_nerd_config(), stream=None, default_flow_style=False
+        _global_config.get_nerd_config(),
+        stream=None,
+        default_flow_style=False,
+        sort_keys=False,
     )
-    config_string = f"# Active configuration\n{config_yaml}"
-
-    syntax = Syntax(config_string, "yaml", line_numbers=False)  # , theme="monokai"
+    syntax = Syntax(
+        "\n".join(
+            [
+                "# Active configuration",
+                "# See more info in https://github.com/raulonlab/chatnerds/blob/main/chatnerds/config.yml",
+                config_yaml,
+            ]
+        ),
+        "yaml",
+        line_numbers=False,
+    )  # , theme="monokai"
     console.print(syntax)
 
 
