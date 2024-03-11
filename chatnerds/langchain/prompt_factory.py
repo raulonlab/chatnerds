@@ -37,9 +37,8 @@ class PromptFactory:
         prompt_messages = []
         if system_prompt:
             prompt_messages.append(("system", system_prompt))
-        prompt_messages.append(
-            ("human", "Context: {context}\nQuestion: {question}\nAnswer:")
-        )
+        prompt_messages.append(("human", "Context: {context}"))
+        prompt_messages.append(("human", "Question: {question}"))
 
         prompt = ChatPromptTemplate.from_messages(prompt_messages)
 
@@ -117,7 +116,7 @@ class PromptFactory:
         prompt_messages = []
         if system_prompt:
             prompt_messages.append(("system", system_prompt))
-        prompt_messages.append(("human", "Question: {question}\nAnswer:"))
+        prompt_messages.append(("human", "Question: {question}"))
 
         prompt = ChatPromptTemplate.from_messages(prompt_messages)
 
