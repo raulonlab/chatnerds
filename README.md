@@ -31,32 +31,34 @@ chatnerds --help
 ```
 Usage: chatnerds [OPTIONS] COMMAND [ARGS]...
 
-╭─ Options ─────────────────────────────────────────────────────────────────────────╮
-│ --install-completion          Install completion for the current shell.           │
-│ --show-completion             Show completion for the current shell, to copy it   │
-│                               or customize the installation.                      │
-│ --help                        Show this message and exit.                         │
-╰───────────────────────────────────────────────────────────────────────────────────╯
-╭─ Commands ────────────────────────────────────────────────────────────────────────╮
-│ init                  Initialize a new nerd. A nerd is a collection of sources    │
-│                       and documents                                               │
-│ remove                Remove an existing nerd                                     │
-│ rename                Rename an existing nerd                                     │
-│ activate              Activate a nerd. All subsequent commands like chat, study,  │
-│                       etc. will use the active nerd's sources and documents.      │
-│ list                  List all available nerds                                    │
-│ download-sources      Download audio files (.mp3) of youtube and podcast sources  │
-│ transcribe-downloads  Transcribe downloaded audio files into transcript files     │
-│                       (.transcript)                                               │
-│ study                 Start studying (ingesting) the source documents and save    │
-│                       the embeddings in the local DB                              │
-│ chat                  Start an interactive chat session with your active nerd     │
-│ review                Append a review value to the last chat log                  │
-│ env                   Print the current value of environment variables            │
-│ config                Print the active nerd configuration (config.yml)            │
-│ tools                 Other tools                                                 │
-│ db                    Other commands related with the local DB                    │
-╰───────────────────────────────────────────────────────────────────────────────────╯
+╭─ Options ───────────────────────────────────────────────────────────────────────╮
+│ --install-completion          Install completion for the current shell.         │
+│ --show-completion             Show completion for the current shell, to copy it │
+│                               or customize the installation.                    │
+│ --help                        Show this message and exit.                       │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+╭─ Commands ──────────────────────────────────────────────────────────────────────╮
+│ init                  Initialize a new nerd. A nerd is a collection of sources  │
+│                       and documents                                             │
+│ remove                Remove an existing nerd                                   │
+│ rename                Rename an existing nerd                                   │
+│ activate              Activate a nerd. All subsequent commands like chat,       │
+│                       study, etc. will use the active nerd's sources and        │
+│                       documents.                                                │
+│ list                  List all available nerds                                  │
+│ download-sources      Download audio files (.mp3) of youtube and podcast        │
+│                       sources                                                   │
+│ transcribe-downloads  Transcribe downloaded audio files into transcript files   │
+│                       (.transcript)                                             │
+│ study                 Start studying (ingesting) the source documents and save  │
+│                       the embeddings in the local DB                            │
+│ chat                  Start an interactive chat session with your active nerd   │
+│ review                Append a review value to the last chat log                │
+│ env                   Print the current value of environment variables          │
+│ config                Print the active nerd configuration (config.yml)          │
+│ tools                 Other tools                                               │
+│ db                    Other commands related with the local DB                  │
+╰─────────────────────────────────────────────────────────────────────────────────╯
 
 ```
 
