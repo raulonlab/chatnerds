@@ -64,7 +64,7 @@ class YoutubeDownloader(EventEmitter):
                         channel.video_urls[
                             0 : min(
                                 self.config.YOUTUBE_MAXIMUM_EPISODE_COUNT,
-                                len(playlist.video_urls),
+                                len(channel.video_urls),
                             )
                         ]
                     )
