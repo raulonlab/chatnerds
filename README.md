@@ -96,18 +96,18 @@ You can also `list`, `rename` and `remove` nerds.
 Nerds can ingest information from these 3 sources:
 
 - **Document files in the directory `source_documents/`**. The supported formats with the loader class (from Langchain) used are the following:
-	- `".pdf"`: PDFMinerLoader,
-	- `".epub"`: UnstructuredEPubLoader,
-	- `".md"`: UnstructuredMarkdownLoader,
-	- `".txt"`: TextLoader,
-	- `".doc"`: UnstructuredWordDocumentLoader,
-	- `".docx"`: UnstructuredWordDocumentLoader,
-	- `".enex"`: EverNoteLoader,
-	- `".csv"`: CSVLoader,
-	- `".html"`: UnstructuredHTMLLoader,
-	- `".odt"`: UnstructuredODTLoader,
-	- `".ppt"`: UnstructuredPowerPointLoader,
-	- `".pptx"`: UnstructuredPowerPointLoader,
+  - `".pdf"`: PDFMinerLoader,
+  - `".epub"`: UnstructuredEPubLoader,
+  - `".md"`: UnstructuredMarkdownLoader,
+  - `".txt"`: TextLoader,
+  - `".doc"`: UnstructuredWordDocumentLoader,
+  - `".docx"`: UnstructuredWordDocumentLoader,
+  - `".enex"`: EverNoteLoader,
+  - `".csv"`: CSVLoader,
+  - `".html"`: UnstructuredHTMLLoader,
+  - `".odt"`: UnstructuredODTLoader,
+  - `".ppt"`: UnstructuredPowerPointLoader,
+  - `".pptx"`: UnstructuredPowerPointLoader,
 
 - **Youtube URLs in the file `youtube.sources`**: Links to videos, playlists and channels are supported. One url per line. Lines starting with `#` are ignored.
 - **Podcast URLs in the file `podcast.sources`**: Links to XML feeds are supported. One url per line. Lines starting with `#` are ignored.
@@ -134,7 +134,7 @@ chatnerds transcribe-downloads
 
 ![Study diagram](docs/study.png)
 
-Start studying (also known as ingesting) the documents in `source_documents/`:
+Start studying (also known as ingesting) the documents located in `source_documents/` and save the data in the vector DB:
 
 ```bash
 chatnerds study
@@ -148,6 +148,8 @@ For each document, the study process does the following steps:
 - Store the document, big chunks, small chunks and embeddings in the local DB
 
 Documents already processed and stored in the database are skipped
+
+For the embedding calculations, it uses the Langchain classes HuggingFaceInstructEmbeddings or HuggingFaceEmbeddings. The model can be set up in the config.yml file of the nerd. The default model is `hkunlp/instructor-large`
 
 ### Chat
 
@@ -164,6 +166,31 @@ chatnerds chat "..."
 ```
 
 > The first time using a new LLM model, it will download the model files and might take a while
+
+The LLM used for completion can be set in the `config.yml` of the nerd. See more details about the nerd config in next sections. The default model is `mistral01_gguf`:
+```
+mistral01_gguf:
+  provider: llamacpp
+  prompt_type: mistral
+  model_id: TheBloke/Mistral-7B-Instruct-v0.1-GGUF
+  model_basename: mistral-7b-instruct-v0.1.Q4_K_M.gguf
+  temperature: 0.2
+  max_tokens: 8192
+  n_batch: 1024  # 512 (Default: 8) set this based on your GPU & CPU RAM
+  n_gpu_layers: -1
+```
+
+The model provider (aka model loader) can be set with the property `provider`. These are the available providers:
+- `provider: llamacpp`: (Default if not present) HuggingFace model with `LlamaCpp`
+- `provider: ollama`: Ollama server
+- `provider: openai`: OpenAI server (base_url is configurable in order to use other APIs with the same interface than OpenAI)
+
+> All the properties defined in the model will be sent to the provider class (temperature, max_tokens, etc)
+
+The prompt can also be formated depending on the model architectures with the property `prompt_type`. These are the available prompt types:
+- `prompt_type: llama`: Specific Llama prompt syntax. Use it with provider `llamacpp` and a llama/llama2 type model
+- `prompt_type: mistral`: Specific Mistral prompt syntax. Use it with provider `llamacpp` and a mistral type model
+- `prompt_type: None` (or not set): No formatting is applied to the prompt. Use it with provider `ollama` and `openai`
 
 ### Nerd configuration
 
