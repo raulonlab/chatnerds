@@ -7,6 +7,10 @@ install-metal:
 #	CMAKE_ARGS="-DLLAMA_METAL=on" FORCE_CMAKE=1 pip install --upgrade --force-reinstall --no-cache-dir llama-cpp-python 
 	CMAKE_ARGS="-DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_APPLE_SILICON_PROCESSOR=arm64 -DLLAMA_METAL=on" pip install --upgrade --force-reinstall --no-cache-dir llama-cpp-python
 
+### Install optional package whisper-mps
+poetry-install-whisper-mps:
+	poetry run pip install whisper-mps
+
 ## Poetry commands
 ### Export requirements.txt and requirements-dev.txt
 poetry-export-requirements:
