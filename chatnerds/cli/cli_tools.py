@@ -24,31 +24,39 @@ def transcribe_youtube_command(
     # Local import of YoutubeDownloader
     from chatnerds.tools.youtube_downloader import YoutubeDownloader
 
-    youtube_downloader = YoutubeDownloader(source_urls=[url], config=_global_config)
-    audio_output_file_paths = youtube_downloader.run()
+    try:
+        youtube_downloader = YoutubeDownloader(source_urls=[url], config=_global_config)
+        audio_output_file_paths = youtube_downloader.run()
 
-    if len(audio_output_file_paths) == 0:
-        logging.error(f"Unable to download audio from url: {url}")
+        if len(audio_output_file_paths) == 0:
+            logging.error(f"Unable to download audio from url: {url}")
+            raise typer.Abort()
+
+        # Local import of AudioTranscriber
+        from chatnerds.tools.audio_transcriber import AudioTranscriber
+
+        audio_transcriber = AudioTranscriber(config=_global_config)
+        rprint(f"Transcribing audio file '{audio_output_file_paths[0]}'...")
+        transcript_output_file_paths = audio_transcriber.run(
+            source_files=audio_output_file_paths
+        )
+
+        if len(transcript_output_file_paths) == 0:
+            logging.error(
+                f"Unable to transcript audio file '{audio_output_file_paths[0]}'"
+            )
+            raise typer.Abort()
+
+        transcript_output_file_path = transcript_output_file_paths[0]
+        with open(transcript_output_file_path, "r") as transcript_file:
+            transcript = transcript_file.read()
+            rprint(f"\n[bold]Transcript of youtube video {url}:", flush=True)
+            rprint(Panel(transcript))
+    except Exception as e:
+        logging.error("Error transcribing audio of youtube video")
+        raise e
+    except SystemExit:
         raise typer.Abort()
-
-    # Local import of AudioTranscriber
-    from chatnerds.tools.audio_transcriber import AudioTranscriber
-
-    audio_transcriber = AudioTranscriber(config=_global_config)
-    rprint(f"Transcribing audio file '{audio_output_file_paths[0]}'...")
-    transcript_output_file_paths = audio_transcriber.run(
-        source_files=audio_output_file_paths
-    )
-
-    if len(transcript_output_file_paths) == 0:
-        logging.error(f"Unable to transcript audio file '{audio_output_file_paths[0]}'")
-        raise typer.Abort()
-
-    transcript_output_file_path = transcript_output_file_paths[0]
-    with open(transcript_output_file_path, "r") as transcript_file:
-        transcript = transcript_file.read()
-        rprint(f"\n[bold]Transcript of youtube video {url}:", flush=True)
-        rprint(Panel(transcript))
 
 
 @app.command("transcribe-audio", help="Transcribe mp3 audio file")
@@ -59,23 +67,29 @@ def transcribe_audio_command(
     # Local import of AudioTranscriber
     from chatnerds.tools.audio_transcriber import AudioTranscriber
 
-    audio_transcriber = AudioTranscriber(config=_global_config)
-    rprint(f"Transcribing audio file '{input_file_path}'...")
-    results, errors = audio_transcriber.run(
-        source_files=[input_file_path],
-        output_path=output_path,
-        force=True,
-    )
+    try:
+        audio_transcriber = AudioTranscriber(config=_global_config)
+        rprint(f"Transcribing audio file '{input_file_path}'...")
+        results, errors = audio_transcriber.run(
+            source_files=[input_file_path],
+            output_path=output_path,
+            force=True,
+        )
 
-    if len(errors) > 0:
-        logging.error("Error transcribing audio file", exc_info=errors[0])
+        if len(errors) > 0:
+            logging.error("Error transcribing audio file", exc_info=errors[0])
+            raise typer.Abort()
+
+        transcript_output_file_path = results[0]
+        with open(transcript_output_file_path, "r") as transcript_file:
+            transcript = transcript_file.read()
+            rprint(f"\n[bold]Transcript of audio file '{input_file_path}':", flush=True)
+            rprint(Panel(transcript))
+    except Exception as e:
+        logging.error("Error transcribing audio file")
+        raise e
+    except SystemExit:
         raise typer.Abort()
-
-    transcript_output_file_path = results[0]
-    with open(transcript_output_file_path, "r") as transcript_file:
-        transcript = transcript_file.read()
-        rprint(f"\n[bold]Transcript of audio file '{input_file_path}':", flush=True)
-        rprint(Panel(transcript))
 
 
 @app.command("summarize")

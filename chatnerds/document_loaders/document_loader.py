@@ -59,7 +59,7 @@ class DocumentLoader(EventEmitter):
         self.config = nerd_config
         self.source_directories = [str(directory) for directory in source_directories]
 
-    def run(self) -> Tuple[List[Document], List[any]]:
+    def run(self, limit: int = _RUN_TASKS_LIMIT) -> Tuple[List[Document], List[any]]:
         logging.debug("Running document loader...")
 
         logging.debug("Finding documents loaded...")
@@ -86,7 +86,7 @@ class DocumentLoader(EventEmitter):
         for source_directory in self.source_directories:
             # Load source documents
             documents, errors = self.load_documents(
-                source_directory, ignored_files=existing_sources
+                source_directory, ignored_files=existing_sources, limit=limit
             )
             if len(documents) > 0:
                 results.extend(documents)
@@ -96,7 +96,10 @@ class DocumentLoader(EventEmitter):
         return results, errors
 
     def load_documents(
-        self, source_dir: str, ignored_files: List[str] = []
+        self,
+        source_dir: str,
+        ignored_files: List[str] = [],
+        limit: int = _RUN_TASKS_LIMIT,
     ) -> Tuple[List[Document], List[any]]:
         """
         Loads all documents from the source documents directory, ignoring specified files
@@ -114,11 +117,13 @@ class DocumentLoader(EventEmitter):
             return [], []
 
         # Limit number of tasks to run
-        if len(filtered_files) > _RUN_TASKS_LIMIT:
-            filtered_files = filtered_files[:_RUN_TASKS_LIMIT]
+        if not 1 < limit < _RUN_TASKS_LIMIT:
+            limit = _RUN_TASKS_LIMIT
+        if len(filtered_files) > limit:
             logging.warning(
-                f"Number of documents to load exceeds limit of {_RUN_TASKS_LIMIT}. Only processing first {_RUN_TASKS_LIMIT} videos."
+                f"Number of documents to load cut to limit {limit} (out of {len(filtered_files)})"
             )
+            filtered_files = filtered_files[:limit]
 
         # Emit start event (show progress bar in UI)
         self.emit(

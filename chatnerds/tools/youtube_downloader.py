@@ -71,7 +71,9 @@ class YoutubeDownloader(EventEmitter):
                 else:
                     self.video_urls.extend(channel.video_urls)
 
-    def run(self, output_path=".") -> Tuple[List[str], List[any]]:
+    def run(
+        self, output_path=".", limit: int = _RUN_TASKS_LIMIT
+    ) -> Tuple[List[str], List[any]]:
         logging.debug("Running youtube downloader...")
 
         # Find downloaded video ids to skip them
@@ -93,20 +95,22 @@ class YoutubeDownloader(EventEmitter):
             return [], []
 
         # Limit number of tasks to run
-        if len(download_arguments) > _RUN_TASKS_LIMIT:
-            download_arguments = download_arguments[:_RUN_TASKS_LIMIT]
+        if not 1 < limit < _RUN_TASKS_LIMIT:
+            limit = _RUN_TASKS_LIMIT
+        if len(download_arguments) > limit:
             logging.warning(
-                f"Number of videos to download exceeds limit of {_RUN_TASKS_LIMIT}. Only processing first {_RUN_TASKS_LIMIT} videos."
+                f"Number of videos to download cut to limit {limit}  (out of {len(download_arguments)})"
             )
+            download_arguments = download_arguments[:limit]
 
         logging.debug(f"Start processing {len(download_arguments)} urls...")
 
         # Emit start event (show progress bar in UI)
         self.emit("start", len(download_arguments))
 
-        max_workers = 1
         results = []
         errors = []
+        max_workers = 1  # Maximum 1 worker (1 download at a time)
         with ThreadPoolExecutor(
             max_workers=max_workers, thread_name_prefix="YoutubeDownloader"
         ) as executor:

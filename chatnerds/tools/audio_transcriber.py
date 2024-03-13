@@ -4,6 +4,7 @@
 
 from typing import List, Optional, Dict, Tuple
 import os
+from time import sleep
 import glob
 import logging
 import torch
@@ -11,7 +12,7 @@ import whisper
 import music_tag
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from chatnerds.config import Config
-from chatnerds.utils import check_for_package, TimeTaken
+from chatnerds.utils import check_for_package
 from chatnerds.langchain.summarizer import Summarizer
 from chatnerds.tools.event_emitter import EventEmitter
 
@@ -44,6 +45,7 @@ class AudioTranscriber(EventEmitter):
         include_filter: str = None,
         force: bool = False,
         dry_run: bool = False,
+        limit: int = _RUN_TASKS_LIMIT,
     ) -> Tuple[List[str], List[any]]:
         logging.debug("Running audio transcriber...")
 
@@ -100,11 +102,13 @@ class AudioTranscriber(EventEmitter):
             return [], []
 
         # Limit number of tasks to run
-        if len(transcribe_audio_arguments) > _RUN_TASKS_LIMIT:
-            transcribe_audio_arguments = transcribe_audio_arguments[:_RUN_TASKS_LIMIT]
+        if not 1 < limit < _RUN_TASKS_LIMIT:
+            limit = _RUN_TASKS_LIMIT
+        if len(transcribe_audio_arguments) > limit:
             logging.warning(
-                f"Number of audios to transcribe exceeds limit of {_RUN_TASKS_LIMIT}. Only processing first {_RUN_TASKS_LIMIT} videos."
+                f"Number of audios to transcribe cut to limit {limit} (out of {len(transcribe_audio_arguments)})"
             )
+            transcribe_audio_arguments = transcribe_audio_arguments[:limit]
 
         logging.debug(
             f"Start processing {len(transcribe_audio_arguments)} audio files..."
@@ -115,7 +119,8 @@ class AudioTranscriber(EventEmitter):
 
         results = []
         errors = []
-        max_workers = max(1, os.cpu_count() // 3)
+        # max_workers = 2 if os.cpu_count() > 4 else 1  # Maximum 2 workers (2 models loaded in memory at a time)
+        max_workers = 1
         with ProcessPoolExecutor(max_workers=max_workers) as executor:
             response_futures = [
                 executor.submit(AudioTranscriber.transcribe_audio, transcribe_argument)
@@ -127,6 +132,18 @@ class AudioTranscriber(EventEmitter):
                     response = response_future.result()
                     if response:
                         results.append(response)
+
+                    try:
+                        response_parts = str(response).split("/")
+                        if len(response_parts) > 1:
+                            self.emit(
+                                "write",
+                                f"✔ .../{response_parts[-2]}/{response_parts[-1]}",
+                            )
+                        else:
+                            self.emit("write", "✔ ...")
+                    except:
+                        pass
                 except Exception as err:
                     errors.append(err)
                     continue
@@ -145,15 +162,13 @@ class AudioTranscriber(EventEmitter):
         if AudioTranscriber.check_device() == "mps" and check_for_package(
             "whisper_mps"
         ):
-            with TimeTaken(f"Transcribing audio with model '{model_name}' using MPS"):
-                transcript = AudioTranscriber.transcribe_audio_using_mps(
-                    input_audio_file_path=input_audio_file_path, model_name=model_name
-                )
+            transcript = AudioTranscriber.transcribe_audio_using_mps(
+                input_audio_file_path=input_audio_file_path, model_name=model_name
+            )
         else:
-            with TimeTaken(f"Transcribing audio with model '{model_name}' using CPU"):
-                transcript = AudioTranscriber.transcribe_audio_using_cpu(
-                    input_audio_file_path=input_audio_file_path, model_name=model_name
-                )
+            transcript = AudioTranscriber.transcribe_audio_using_cpu(
+                input_audio_file_path=input_audio_file_path, model_name=model_name
+            )
 
         audio_file_tags = AudioTranscriber.read_audio_file_tags(
             str(input_audio_file_path)
@@ -167,6 +182,9 @@ class AudioTranscriber(EventEmitter):
                 file.write(
                     f'{tag_key}="{AudioTranscriber.escape_dotenv_value(tag_value)}"\n'
                 )
+
+        # Cool CPU a bit
+        sleep(1)
 
         return transcript_file_path
 
@@ -204,6 +222,7 @@ class AudioTranscriber(EventEmitter):
 
         """Get speech recognition model."""
         logging.debug(f"Transcribing audio using MPS: '{input_audio_file_path}' ...")
+
         result = whispermps.transcribe(input_audio_file_path, model=model_name)
 
         """Put a newline character after each sentence in the transcript."""

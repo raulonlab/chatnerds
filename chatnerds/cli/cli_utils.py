@@ -23,6 +23,16 @@ DownloadSourceOption = Annotated[
 ]
 
 
+LimitOption = Annotated[
+    Optional[int],
+    typer.Option(
+        "--limit",
+        "-l",
+        help="Limit the maximum number of items to process per run. If not specified, use default limit of 1000 items.",
+    ),
+]
+
+
 DirectoryFilterArgument = Annotated[
     Optional[str],
     typer.Argument(
@@ -75,6 +85,12 @@ class TqdmHolder:
             return
 
         self._tqdm.update(*args, **kwargs)
+
+    def write(self, *args, **kwargs):
+        if not self._tqdm:
+            return
+
+        self._tqdm.write(*args, **kwargs)
 
     def close(self):
         if not self._tqdm:

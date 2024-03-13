@@ -2,6 +2,7 @@ import os
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 import uuid
+from time import sleep
 from datetime import datetime, timezone
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from langchain_core.embeddings import Embeddings
@@ -30,7 +31,9 @@ class DocumentEmbedder(EventEmitter):
         self.config = nerd_config
 
     # @staticmethod
-    def run(self, documents: List[Document]) -> Tuple[List[str], List[any]]:
+    def run(
+        self, documents: List[Document], limit: int = _RUN_TASKS_LIMIT
+    ) -> Tuple[List[str], List[any]]:
         logging.debug("Running document embedder...")
 
         if len(documents) == 0:
@@ -38,11 +41,13 @@ class DocumentEmbedder(EventEmitter):
             return [], []
 
         # Limit number of tasks to run
-        if len(documents) > _RUN_TASKS_LIMIT:
-            documents = documents[:_RUN_TASKS_LIMIT]
+        if not 1 < limit < _RUN_TASKS_LIMIT:
+            limit = _RUN_TASKS_LIMIT
+        if len(documents) > limit:
             logging.warning(
-                f"Number of documents to embeed exceeds limit of {_RUN_TASKS_LIMIT}. Only processing first {_RUN_TASKS_LIMIT} videos."
+                f"Number of documents to embeed cut to limit {limit} (out of {len(documents)})"
             )
+            documents = documents[:limit]
 
         sources_database = ChromaDatabase(
             collection_name=DEFAULT_SOURCES_COLLECTION_NAME,
@@ -59,7 +64,9 @@ class DocumentEmbedder(EventEmitter):
 
         results = []
         errors = []
-        max_workers = max(1, os.cpu_count() // 4)
+        max_workers = (
+            2 if os.cpu_count() > 4 else 1
+        )  # Maximum 2 workers (2 models loaded in memory at a time)
         with ProcessPoolExecutor(max_workers=max_workers) as executor:
             response_futures = [
                 executor.submit(self.split_and_embed_document, document)
@@ -103,6 +110,14 @@ class DocumentEmbedder(EventEmitter):
                         results.append(
                             source_ids[0]
                         )  # append the id of the source document
+
+                        try:
+                            self.emit(
+                                "write",
+                                f"✔ {source_documents[0].metadata.get('source', '...')}",
+                            )
+                        except:
+                            pass
                 except Exception as err:
                     errors.append(err)
                     continue
@@ -168,6 +183,9 @@ class DocumentEmbedder(EventEmitter):
                     [document.page_content for document in documents]
                 )
             )
+
+        # Cool CPU a bit
+        sleep(1)
 
         return {
             "documents_lists": documents_lists,

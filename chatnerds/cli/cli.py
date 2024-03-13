@@ -46,6 +46,7 @@ def main(ctx: typer.Context):
 )
 def study_command(
     directory_filter: cli_utils.DirectoryFilterArgument = None,
+    limit: cli_utils.LimitOption = None,
 ):
     cli_utils.validate_confirm_active_nerd()
 
@@ -67,7 +68,9 @@ def study_command(
         document_loader.on("update", tqdm_holder.update)
         document_loader.on("end", tqdm_holder.close)
 
-        document_loader_results, document_loader_errors = document_loader.run()
+        document_loader_results, document_loader_errors = document_loader.run(
+            limit=limit
+        )
 
         tqdm_holder.close()
         logging.info(
@@ -86,9 +89,11 @@ def study_command(
         document_embedder.on("start", tqdm_holder.start)
         document_embedder.on("update", tqdm_holder.update)
         document_embedder.on("end", tqdm_holder.close)
+        document_embedder.on("write", tqdm_holder.write)
 
         document_embedder_results, document_embedder_errors = document_embedder.run(
             documents=document_loader_results,
+            limit=limit,
         )
 
         tqdm_holder.close()
