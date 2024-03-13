@@ -4,7 +4,7 @@ packages = [
     {include = "chatnerds"},
 ]
 include = ["chatnerds/config.yml"]
-version = "0.2.5"
+version = "0.2.6"
 description = "CLI application to Q&A with YouTube videos, podcasts and documents offline using local LLMs and RAG (Retrieval-augmented generation) techniques"
 authors = ["Raul On Lab <raulonlab@gmail.com>"]
 readme = "README.md"
