@@ -1,3 +1,4 @@
+import os
 import logging
 from typing import Optional
 import typer
@@ -5,11 +6,17 @@ from typing_extensions import Annotated
 from rich import print as rprint
 from rich.markup import escape
 from rich.panel import Panel
+from pyfzf.pyfzf import FzfPrompt
+import glob
+from langchain_community.document_loaders.youtube import YoutubeLoader
+from langchain_core.tracers.stdout import ConsoleCallbackHandler
 from chatnerds.cli.cli_utils import (
     OrderedCommandsTyperGroup,
     UrlFilterArgument,
     validate_confirm_active_nerd,
 )
+from chatnerds.langchain.llm_factory import LLMFactory
+from chatnerds.langchain.chain_factory import ChainFactory
 from chatnerds.config import Config
 
 
@@ -17,8 +24,8 @@ _global_config = Config.environment_instance()
 app = typer.Typer(cls=OrderedCommandsTyperGroup, no_args_is_help=True)
 
 
-@app.command("transcribe-youtube", help="Transcribe youtube video")
-def transcribe_youtube_command(
+@app.command("download-youtube", help="Downloads audio file (.mp3) of youtube video")
+def download_youtube_command(
     url: UrlFilterArgument = None,
 ):
     # Local import of YoutubeDownloader
@@ -32,29 +39,11 @@ def transcribe_youtube_command(
             logging.error(f"Unable to download audio from url: {url}")
             raise typer.Abort()
 
-        # Local import of AudioTranscriber
-        from chatnerds.tools.audio_transcriber import AudioTranscriber
-
-        audio_transcriber = AudioTranscriber(config=_global_config)
-        rprint(f"Transcribing audio file '{audio_output_file_paths[0]}'...")
-        transcript_output_file_paths = audio_transcriber.run(
-            source_files=audio_output_file_paths
+        rprint(
+            f"\n[bold]Audio downloaded successfully in: {audio_output_file_paths}",
+            flush=True,
         )
 
-        if len(transcript_output_file_paths) == 0:
-            logging.error(
-                f"Unable to transcript audio file '{audio_output_file_paths[0]}'"
-            )
-            raise typer.Abort()
-
-        transcript_output_file_path = transcript_output_file_paths[0]
-        with open(transcript_output_file_path, "r") as transcript_file:
-            transcript = transcript_file.read()
-            rprint(f"\n[bold]Transcript of youtube video {url}:", flush=True)
-            rprint(Panel(transcript))
-    except Exception as e:
-        logging.error("Error transcribing audio of youtube video")
-        raise e
     except SystemExit:
         raise typer.Abort()
 
@@ -85,39 +74,188 @@ def transcribe_audio_command(
             transcript = transcript_file.read()
             rprint(f"\n[bold]Transcript of audio file '{input_file_path}':", flush=True)
             rprint(Panel(transcript))
-    except Exception as e:
-        logging.error("Error transcribing audio file")
-        raise e
+
+    except SystemExit:
+        raise typer.Abort()
+
+
+@app.command("transcribe-youtube", help="Get transcript of youtube video")
+def transcribe_youtube_command(
+    url: UrlFilterArgument = None,
+):
+    try:
+        youtube_loader = YoutubeLoader.from_youtube_url(url, add_video_info=True)
+        transcript_documents = youtube_loader.load()
+
+        if not transcript_documents or len(transcript_documents) == 0:
+            logging.error(f"Unable to download transcript of video url: {url}")
+            raise typer.Abort()
+
+        rprint(f"\n[bold]Transcript of youtube video {url}:", flush=True)
+        rprint(Panel(transcript_documents[0].page_content))
+
     except SystemExit:
         raise typer.Abort()
 
 
 @app.command("summarize")
-def summarize_command(input_file_path: str):
+def summarize_command(input_file_path: Optional[str] = None):
     nerd_config = _global_config.get_nerd_config()
+
+    if not input_file_path:
+        glob_root_dir = os.path.join(
+            _global_config.get_nerd_base_path(), "source_documents"
+        )
+        source_files_iterator = glob.iglob(
+            "**/*.*", root_dir=glob_root_dir, recursive=True
+        )
+
+        fzf = FzfPrompt()
+        selected_source_files = fzf.prompt(
+            source_files_iterator,
+            "--cycle --no-multi --keep-right --scheme path --tiebreak end",
+        )
+
+        if not selected_source_files or len(selected_source_files) == 0:
+            print("No source selected. Exiting...")
+            return
+
+        input_file_path = os.path.join(glob_root_dir, selected_source_files[0])
 
     # Local import of TranscriptLoader
     from chatnerds.document_loaders.transcript_loader import TranscriptLoader
 
-    try:
-        transcript_documents = TranscriptLoader(input_file_path).load()
+    transcript_documents = TranscriptLoader(input_file_path).load()
 
-        # Local import of Summarizer
-        from chatnerds.langchain.summarizer import Summarizer
+    # Local import of Summarizer
+    from chatnerds.langchain.summarizer import Summarizer
 
-        summarizer = Summarizer(nerd_config)
+    llm, prompt_type = LLMFactory(config=nerd_config).get_summarize_model()
+    summarizer = Summarizer(
+        nerd_config,
+        llm=llm,
+        prompt_type=prompt_type,
+    )
 
-        rprint(f"Summarizing file '{input_file_path}'...")
-        summary = summarizer.summarize_text(transcript_documents[0].page_content)
+    rprint(f"Summarizing file '{input_file_path}'...")
+    summary = summarizer.summarize_text(transcript_documents[0].page_content)
 
-        rprint(f"\n[bold]Summary of '{input_file_path}':", flush=True)
-        rprint(Panel(summary))
-
-    except Exception as e:
-        logging.error(
-            f"Error running test summarize with input file {input_file_path}:\n{e}"
+    rprint(
+        Panel(
+            f"{summary}",
+            title="Summary",
+            title_align="left",
         )
-        raise typer.Abort()
+    )
+
+
+@app.command("tag")
+def tag_command(input_file_path: Optional[str] = None):
+    nerd_config = _global_config.get_nerd_config()
+
+    if not input_file_path:
+        glob_root_dir = os.path.join(
+            _global_config.get_nerd_base_path(), "source_documents"
+        )
+        source_files_iterator = glob.iglob(
+            "**/*.*", root_dir=glob_root_dir, recursive=True
+        )
+
+        fzf = FzfPrompt()
+        selected_source_files = fzf.prompt(
+            source_files_iterator,
+            "--cycle --no-multi --keep-right --scheme path --tiebreak end",
+        )
+
+        if not selected_source_files or len(selected_source_files) == 0:
+            print("No source selected. Exiting...")
+            return
+
+        input_file_path = os.path.join(glob_root_dir, selected_source_files[0])
+
+    # Local import of TranscriptLoader
+    from chatnerds.document_loaders.transcript_loader import TranscriptLoader
+
+    transcript_documents = TranscriptLoader(input_file_path).load()
+
+    # Local import of Tagger
+    from chatnerds.langchain.tagger import Tagger
+
+    llm, prompt_type = LLMFactory(config=nerd_config).get_summarize_model()
+    tagger = Tagger(
+        nerd_config,
+        llm=llm,
+        prompt_type=prompt_type,
+        prompt=nerd_config["prompts"].get("find_tags_prompt", None),
+        n_tags=5,
+    )
+
+    rprint(f"Tagging file '{input_file_path}'...")
+    tags = tagger.tag_text(transcript_documents[0].page_content)
+
+    if isinstance(tags, str):
+        tags = tags.split(",")
+
+    if isinstance(tags, list):
+        tags_str = ", ".join(tags)
+    else:
+        tags_str = str(tags)
+
+    rprint(
+        Panel(
+            f"{tags_str}",
+            title="Tags",
+            title_align="left",
+        )
+    )
+
+
+@app.command("find-expanded-questions")
+def find_expanded_questions_command(
+    query: Annotated[
+        str,
+        typer.Argument(help="The query input to find expanded questions"),
+    ],
+):
+    nerd_config = _global_config.get_nerd_config()
+
+    retrieve_chain_config = nerd_config.get("retrieve_chain", None)
+    if isinstance(retrieve_chain_config, str) and retrieve_chain_config in nerd_config:
+        retrieve_chain_config = nerd_config.get(retrieve_chain_config, None)
+
+    if not isinstance(retrieve_chain_config, dict):
+        raise ValueError(
+            f"Invalid value in 'retrieve_chain' configuration: {retrieve_chain_config}"
+        )
+
+    question_expansion_chain = ChainFactory(nerd_config).get_question_expansion_chain(
+        retrieve_chain_config
+    )
+
+    callbacks = []
+    if _global_config.VERBOSE > 1:
+        callbacks.append(ConsoleCallbackHandler())
+
+    question_expansion_response = question_expansion_chain.invoke(
+        query, config={"callbacks": callbacks}
+    )
+
+    if isinstance(question_expansion_response, str):
+        questions_list = question_expansion_response.split("\n")
+    elif isinstance(question_expansion_response, list):
+        questions_list = question_expansion_response
+    else:
+        questions_list = [str(question_expansion_response)]
+
+    questions_str = "\n".join([f"- {question}" for question in questions_list])
+
+    rprint(
+        Panel(
+            questions_str,
+            title="Expanded questions",
+            title_align="left",
+        )
+    )
 
 
 @app.command(
@@ -157,10 +295,11 @@ def search_command(
 
     embeddings = LLMFactory(config=nerd_config).get_embedding_function()
 
-    # Local import of ChromaDatabase
-    from chatnerds.langchain.chroma_database import ChromaDatabase
+    # Local import of StoreFactory
+    from chatnerds.stores.store_factory import StoreFactory
 
-    database = ChromaDatabase(embeddings=embeddings, config=nerd_config["chroma"])
+    store_factory = StoreFactory(nerd_config)
+    database = store_factory.get_vector_store(embeddings=embeddings)
 
     similar_chunks = database.find_similar_docs(
         query=query,

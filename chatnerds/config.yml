@@ -1,20 +1,24 @@
-system_prompt: >
-  Use the following pieces of context to answer the question at the end. 
-  If you don't know the answer, just say that you don't know, don't try to make up an answer.
 use_history: false  # Adding history to conversations is WIP
 device_type: cpu    # (default: cpu) Select device type: cuda, mps, cpu
-summarize_chain_type: "stuff"  # (default: stuff) Select summarization chain type: stuff, map_reduce, refine
 
+# Default model
+# Select the key of one of the available presets in 'config.models.yml'
+default_model: mistral-7b-instruct-v0.1-gguf
+
+# Select the key of one of the vector store provider (chroma or qdrant)
+vector_store: chroma
+
+# HuggingFace embeddings (using sentence-transformer). Ex. model_name: hkunlp/instructor-large, BAAI/bge-large-en-v1.5
 embeddings:
   model_name: hkunlp/instructor-large
+  # encode_kwargs:
+  #   normalize_embeddings: false  # (default: false) Normalize embeddings before storing them in the index.
   # model_kwargs:
   #   device: mps  # mps is not available yet in HuggingFace embeddings
 
-llm: mistral-7b-instruct-v0.1-gguf  # Select the key of one of the available presets in 'llms'
-
 splitter:
   chunk_size: 1000  # (default: 1000) Maximum number of tokens per chunk or model max_seq_length if larger
-  chunk_overlap: 100  # (default: 100) Number of tokens to overlap between chunks.
+  chunk_overlap: 0  # (default: 0) Number of tokens to overlap between chunks.
   # keep_separator: false  # (default: false) Keep the separator token at the end of each chunk.
 
 retriever:
@@ -26,153 +30,31 @@ retriever:
     # lambda_mult: 0.2  # Diversity of results returned by MMR; 1 for minimum diversity and 0 for maximum. (Default: 0.5)
     # filter: Filter by document metadata. Ex: {'paper_title':'GPT-4 Technical Report'}}
 
+reranker:
+  model_name: cross-encoder/ms-marco-MiniLM-L-6-v2  # BAAI/bge-reranker-large
+  # num_labels:
+  # max_length:
+  # device:
+  # tokenizer_args:
+  # automodel_args:
+
+summarize:
+  # model: mistral-7b-instruct-v0.1-gguf
+  summarize_chain_type: "map_reduce"  # (default: map_reduce) Select summarization chain type: stuff, map_reduce, refine
+
 chat_chain:
   n_expanded_questions: 3  # Number of similar questions to expand the original query with. Set 0 to disable query expansion. (Default: 3)
   use_cross_encoding_rerank: true  # Use cross-encoding reranking of retrieved documents. (Default: true)
   n_combined_documents: 6  # Number of documents to combine as a context for the prompt sent to the LLM. (Default: 6)
 
+retrieve_chain: chat_chain
+
 chroma:
   is_persistent: true
   anonymized_telemetry: false
 
-# LLM presets
-llms:
-  openai-gpt-3.5-turbo:
-    provider: openai
-    model_name: gpt-3.5-turbo
-    temperature: 0.2
-    # top_p: 0.95
-    # max_tokens: 4096
-    # verbose: false
-
-  openai-gpt-4:
-    provider: openai
-    model_name: gpt-4
-    temperature: 0.2
-    # top_p: 0.95
-    # max_tokens: 8192
-    # verbose: false
-
-  ollama-llama2:
-    provider: ollama
-    model: llama2-uncensored:7b-chat-q4_K_M
-    temperature: 0.5  # Default: 0.8
-    # top_p: 0.5  # Default: 0.9
-    num_ctx: 16000  # 8192  # Default: 2048
-    # verbose: false
-
-  ollama-mistral-instruct:
-    provider: ollama
-    model: mistral:instruct
-    temperature: 0.2  # Default: 0.8
-    # top_p: 0.5  # Default: 0.9
-    num_ctx: 8192  # 8192  # Default: 2048
-    # verbose: false
-
-  lmstudio-localhost:
-    provider: openai
-    model_name: local_model
-    base_url: http://localhost:1234/v1
-    temperature: 0.2
-    # top_p: 0.95
-    # max_tokens: 4096
-    # verbose: false
-
-  mistral-7b-instruct-v0.1-gguf:
-    provider: llamacpp
-    prompt_type: mistral
-    model_id: TheBloke/Mistral-7B-Instruct-v0.1-GGUF
-    model_basename: mistral-7b-instruct-v0.1.Q4_K_M.gguf
-    temperature: 0.2
-    # top_p: 0.95
-    n_ctx: 8192  # 16000
-    max_tokens: 8192  # 4096
-    n_batch: 1024  # 512 (Default: 8) set this based on your GPU & CPU RAM
-    n_gpu_layers: -1
-  
-  # https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.2-GGUF
-  mistral-7b-instruct-v0.2-gguf:
-    provider: llamacpp
-    prompt_type: mistral
-    model_id: TheBloke/Mistral-7B-Instruct-v0.2-GGUF
-    model_basename: mistral-7b-instruct-v0.2.Q4_K_M.gguf
-    # https://github.com/langchain-ai/langchain/blob/master/libs/langchain/langchain/llms/llamacpp.py
-    # llamacpp kwargs
-    temperature: 0.2  # Default: 0.8
-    # top_p: 0.5  # Default: 0.9
-    n_ctx: 8192 # https://medium.com/@mne/run-mistral-7b-model-on-macbook-m1-pro-with-16gb-ram-using-llama-cpp-44134694b773
-    max_tokens: 8192
-    n_batch: 512  # Should be between 1 and n_ctx, set this based on your GPU & CPU RAM
-    # n_threads: 7
-    n_gpu_layers: -1 # 130
-    # verbose: false
-    # seed: 42
-
-  llama-wizardlm-7b-uncensored-gguf:
-    prompt_type: llama
-    model_id: TheBloke/WizardLM-7B-uncensored-GGUF
-    model_basename: WizardLM-7B-uncensored.Q4_K_M.gguf
-    # https://github.com/ggerganov/llama.cpp/blob/master/examples/main/README.md
-    # llamacpp kwargs
-    temperature: 0.2  # Default: 0.8
-    top_p: 0.5  # Default: 0.9
-    n_ctx: 8192
-    max_tokens: 4096
-    n_batch: 512  # set this based on your GPU & CPU RAM
-    n_gpu_layers: -1
-
-  llama-speechless-13b-gguf:
-    prompt_type: llama
-    model_id: TheBloke/Speechless-Llama2-Hermes-Orca-Platypus-WizardLM-13B-GGUF
-    model_basename: speechless-llama2-hermes-orca-platypus-wizardlm-13b.Q4_K_M.gguf
-    # llamacpp kwargs
-    temperature: 0.2
-    top_p: 0.95
-    n_ctx: 8192
-    max_tokens: 4096
-    n_batch: 512  # set this based on your GPU & CPU RAM
-    n_gpu_layers: 1
-
-  llama-wizard-vicuna-7b-uncensored-gguf:
-    # prompt_type: llama
-    model_id: TheBloke/Wizard-Vicuna-7B-Uncensored-GGUF
-    model_basename: Wizard-Vicuna-7B-Uncensored.Q4_K_M.gguf
-    temperature: 0.2
-    # top_p: 0.95  # Default: 0.9
-    n_ctx: 8192
-    # max_tokens: 4096
-    n_batch: 512  # Set this based on your GPU & CPU RAM
-    n_gpu_layers: -1
-
-  # https://artificialcorner.com/run-mistral7b-quantized-for-free-on-any-computer-2cadc18b45a2
-  # https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.1-GPTQ#how-to-use-this-gptq-model-from-python-code
-  mistral-7b-instruct-v0.1-gptq:
-    prompt_type: mistral
-    model_id: TheBloke/Mistral-7B-Instruct-v0.1-GPTQ
-    model_basename: model.safetensors
-    # temperature: 0.2
-    # n_ctx: 4096
-    # max_tokens: 4096
-    # top_p: 0.95
-    # n_batch: 512  # set this based on your GPU & CPU RAM
-    # n_gpu_layers: 32
-
-  llama-wizard-vicuna-7b-uncensored-gptq:
-    prompt_type: llama
-    model_id: TheBloke/Wizard-Vicuna-7B-Uncensored-GPTQ
-    model_basename: model.safetensors 
-
-  llama-wizard-vicuna-7b-uncensored-hf:
-    prompt_type: llama
-    model_id: TheBloke/Wizard-Vicuna-7B-Uncensored-HF
-    model_basename: WizardLM-7B-uncensored.Q4_K_M.gguf
-    model_kwargs:
-      temperature: 0.2
-      n_ctx: 4096
-      max_tokens: 4096
-      top_p: 0.95
-      n_batch: 512  # set this based on your GPU & CPU RAM
-      n_gpu_layers: 32
-      local_files_only: false
-    pipeline_kwargs:
-      max_new_tokens: 4096
+qdrant:
+  # location: ":memory:"  # Local mode with in-memory storage only
+  # path: "/tmp/local_qdrant"
+  # url: "http://localhost:6333/..."
+  # prefer_grpc: true

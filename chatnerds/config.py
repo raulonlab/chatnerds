@@ -17,8 +17,16 @@ load_dotenv(
 
 @dataclass
 class Config(object):
-    _DB_NAME: ClassVar[str] = "db"  # Name of the database directory
+    _NERD_STORE_DIRECTORYNAME: ClassVar[str] = (
+        ".nerd_store"  # Name of the nerd store directory
+    )
     _NERD_CONFIG_FILENAME: ClassVar[str] = "config.yml"  # Name of the nerd config file
+    _NERD_CONFIG_MODELS_FILENAME: ClassVar[str] = (
+        "config.models.yml"  # Name of the models config file
+    )
+    _NERD_CONFIG_PROMPTS_FILENAME: ClassVar[str] = (
+        "config.prompts.yml"  # Name of the prompts config file
+    )
     _YOUTUBE_SOURCES_FILENAME: ClassVar[str] = (
         "youtube.sources"  # Name of the youtube sources file
     )
@@ -30,7 +38,6 @@ class Config(object):
 
     ACTIVE_NERD: Union[str, None] = None  # (Default: None) Name of the active nerd
     NERDS_DIRECTORY_PATH: str = "nerds"  # (Default: "nerds") Path to nerds directory
-    """Description of NERDS_DIRECTORY_PATH. Hahahaha"""
     LOG_FILE_LEVEL: Optional[str] = (
         None  # (Default: None) Logging level for the log file. Values: INFO, WARNING, ERROR, CRITICAL, NOTSET. If None, disable logging to file
     )
@@ -179,17 +186,16 @@ class Config(object):
         if not nerd_name:
             raise ValueError("No nerd name provided")
 
+        nerd_base_path = config.get_nerd_base_path(nerd_name=nerd_name)
+
         default_config = self.read_nerd_config(Path(__file__).parent)
-        active_nerd_config = self.read_nerd_config(
-            config.get_nerd_base_path(nerd_name=nerd_name)
-        )
+        active_nerd_config = self.read_nerd_config(nerd_base_path)
 
         merged_nerd_config = self.merge_config(default_config, active_nerd_config)
-        merged_nerd_config["chroma"]["persist_directory"] = str(
-            Path(config.get_nerd_base_path(nerd_name=nerd_name), self._DB_NAME)
-        )
 
-        return merged_nerd_config
+        merged_nerd_config["_nerd_base_path"] = str(nerd_base_path)
+
+        return dict(merged_nerd_config)
 
     def get_nerd_base_path(self, nerd_name: Optional[str] = None) -> Union[str, Path]:
         config = Config.environment_instance()
@@ -263,12 +269,56 @@ class Config(object):
             file_handler.write("%s=%s\n" % ("ACTIVE_NERD", self.ACTIVE_NERD or ""))
 
     @classmethod
-    def read_nerd_config(cls, path: Union[Path, str]) -> Dict[str, Any]:
-        path = Path(path)
-        if path.is_dir():
-            path = path / cls._NERD_CONFIG_FILENAME
-        with open(path) as f:
-            return yaml.safe_load(f)
+    def read_nerd_config(cls, directory_path: Union[Path, str]) -> Dict[str, Any]:
+        directory_path = Path(directory_path)
+
+        nerd_config = {}
+
+        if directory_path.is_dir():
+            # Load main config file
+            config_file_path = directory_path / cls._NERD_CONFIG_FILENAME
+            try:
+                with open(config_file_path) as config_file_handler:
+                    nerd_config = yaml.safe_load(config_file_handler)
+                    if not nerd_config:
+                        nerd_config = {}
+            except FileNotFoundError:
+                nerd_config = {}
+
+            # Load models config file
+            config_models_file_path = directory_path / cls._NERD_CONFIG_MODELS_FILENAME
+            try:
+                with open(config_models_file_path) as config_models_file_handler:
+                    nerd_config_models = yaml.safe_load(config_models_file_handler)
+                    if not nerd_config_models:
+                        nerd_config_models = {}
+                    nerd_config["models"] = nerd_config_models
+            except FileNotFoundError:
+                nerd_config["models"] = {}
+
+            # Load prompts config file
+            config_prompts_file_path = (
+                directory_path / cls._NERD_CONFIG_PROMPTS_FILENAME
+            )
+            try:
+                with open(config_prompts_file_path) as config_prompts_file_handler:
+                    nerd_config_prompts = yaml.safe_load(config_prompts_file_handler)
+                    if not nerd_config_prompts:
+                        nerd_config_prompts = {}
+                    nerd_config["prompts"] = nerd_config_prompts
+            except FileNotFoundError:
+                nerd_config["prompts"] = {}
+
+        elif directory_path.is_file():
+            try:
+                with open(directory_path) as config_file_handler:
+                    nerd_config = yaml.safe_load(config_file_handler)
+            except FileNotFoundError:
+                pass
+        else:
+            raise ValueError(f"Invalid nerd config path: {directory_path}")
+
+        return nerd_config
 
     @classmethod
     def merge_config(cls, a: Dict[Any, Any], b: Dict[Any, Any]) -> Dict[Any, Any]:

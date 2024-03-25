@@ -5,6 +5,7 @@
 import random
 import re
 import unicodedata
+from datetime import datetime
 from pathlib import Path
 from time import sleep
 import glob
@@ -95,7 +96,7 @@ class YoutubeDownloader(EventEmitter):
             return [], []
 
         # Limit number of tasks to run
-        if not 1 < limit < _RUN_TASKS_LIMIT:
+        if not limit or not 0 < limit < _RUN_TASKS_LIMIT:
             limit = _RUN_TASKS_LIMIT
         if len(download_arguments) > limit:
             logging.warning(
@@ -142,7 +143,7 @@ class YoutubeDownloader(EventEmitter):
 
         wait_seconds = random.randint(
             self.config.YOUTUBE_SLEEP_SECONDS_BETWEEN_DOWNLOADS,
-            3 * self.config.YOUTUBE_SLEEP_SECONDS_BETWEEN_DOWNLOADS,
+            2 * self.config.YOUTUBE_SLEEP_SECONDS_BETWEEN_DOWNLOADS,
         )
         logging.debug(
             f"Start downloading video url {url}  ...waiting {wait_seconds} seconds"
@@ -172,8 +173,18 @@ class YoutubeDownloader(EventEmitter):
         # Audio output file
         audio_output_filename = f"{video_title}.mp3"
         if self.config.YOUTUBE_ADD_DATE_PREFIX is True and publish_date is not None:
-            date_str = publish_date.strftime("%Y-%m-%d")
-            audio_output_filename = f"{date_str} {audio_output_filename}"
+            if isinstance(publish_date, datetime):
+                date_str = publish_date.strftime("%Y-%m-%d")
+            elif isinstance(publish_date, str) and len(publish_date) > 9:
+                date_str = publish_date[:10]
+            else:
+                date_str = None
+                logging.warning(
+                    f"Video '{video_title}' has invalid publish date. Skipping date prefix."
+                )
+
+            if date_str is not None:
+                audio_output_filename = f"{date_str} {audio_output_filename}"
         elif publish_date is None:
             logging.warning(
                 f"Video '{video_title}' has no publish date. Skipping date prefix."

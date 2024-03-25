@@ -18,10 +18,7 @@ from langchain_community.document_loaders import (
     UnstructuredWordDocumentLoader,
 )
 from chatnerds.document_loaders.transcript_loader import TranscriptLoader
-from chatnerds.langchain.chroma_database import (
-    ChromaDatabase,
-    DEFAULT_SOURCES_COLLECTION_NAME,
-)
+from chatnerds.stores.store_factory import StoreFactory
 from chatnerds.tools.event_emitter import EventEmitter
 
 
@@ -62,31 +59,17 @@ class DocumentLoader(EventEmitter):
     def run(self, limit: int = _RUN_TASKS_LIMIT) -> Tuple[List[Document], List[any]]:
         logging.debug("Running document loader...")
 
-        logging.debug("Finding documents loaded...")
-        sources_database = ChromaDatabase(
-            collection_name=DEFAULT_SOURCES_COLLECTION_NAME,
-            config=self.config["chroma"],
-        )
-
-        # Get existing sources to not embed them again
-        collection = sources_database.client.get()
-        all_sources = [
-            metadata["source"]
-            for metadata in collection["metadatas"]
-            if collection.get("metadatas") is not None
-        ]
-
-        existing_sources = []
-        for source in all_sources:
-            if source not in existing_sources:
-                existing_sources.append(source)
+        # Get studied documents to exclude them
+        studied_sources = []
+        with StoreFactory(self.config).get_status_store() as status_store:
+            studied_sources = status_store.get_studied_document_ids()
 
         results: List[Document] = []
         errors = []
         for source_directory in self.source_directories:
             # Load source documents
             documents, errors = self.load_documents(
-                source_directory, ignored_files=existing_sources, limit=limit
+                source_directory, ignored_files=studied_sources, limit=limit
             )
             if len(documents) > 0:
                 results.extend(documents)
@@ -117,7 +100,7 @@ class DocumentLoader(EventEmitter):
             return [], []
 
         # Limit number of tasks to run
-        if not 1 < limit < _RUN_TASKS_LIMIT:
+        if not limit or not 0 < limit <= _RUN_TASKS_LIMIT:
             limit = _RUN_TASKS_LIMIT
         if len(filtered_files) > limit:
             logging.warning(
@@ -159,8 +142,8 @@ class DocumentLoader(EventEmitter):
         if ext in _LOADER_MAPPING:
             loader_class, loader_args = _LOADER_MAPPING[ext]
             loader = loader_class(file_path, **loader_args)
-            loader_documents = loader.load()
+            documents = loader.load()
 
-            return loader_documents
+            return documents
 
         raise ValueError(f"Unsupported file extension '{ext}'")

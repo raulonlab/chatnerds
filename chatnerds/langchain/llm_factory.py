@@ -1,7 +1,7 @@
 import io
 from contextlib import redirect_stdout
 import logging
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, Optional, Tuple
 from langchain.llms.base import LLM as LLMBase
 from langchain_core.embeddings import Embeddings
 from langchain_community.embeddings import (
@@ -22,12 +22,14 @@ class LLMFactory:
 
     def get_embedding_function(self) -> Embeddings:
         embeddings_config = {**self.config["embeddings"]}
-        if embeddings_config["model_name"].startswith("hkunlp/"):
+        if embeddings_config["model_name"].startswith("hkunlp/") or embeddings_config[
+            "model_name"
+        ].startswith("BAAI/"):
             provider_class = HuggingFaceInstructEmbeddings
         else:
             provider_class = HuggingFaceEmbeddings
 
-        # capture module stdout and log them
+        # capture module stdout and log them as debug level
         trap_stdout = io.StringIO()
         with redirect_stdout(trap_stdout):
             provider_instance = provider_class(**embeddings_config)
@@ -36,66 +38,63 @@ class LLMFactory:
 
         return provider_instance
 
-    def get_llm(self) -> LLMBase:
+    def get_summarize_model(self) -> Tuple[LLMBase, str]:
+        selected_summarize_model = self.config.get("summarize", {}).get("model", None)
+
+        return self.get_model(selected_model=selected_summarize_model, is_chat=False)
+
+    def get_model(
+        self, selected_model: Optional[str] = None, is_chat: Optional[bool] = True
+    ) -> Tuple[LLMBase, str]:
         # class CallbackHandler(BaseCallbackHandler):
         #     def on_llm_new_token(self, token: str, **kwargs) -> None:
         #         callback(token)
 
         # callbacks = [CallbackHandler()] if callback else None
+
         device_type = self.config.get("device_type", "cpu")
-        selected_llm = self.config.get("llm", None)
 
-        if not selected_llm:
-            raise ValueError("Selected LLM preset key 'llm:' not found in config file")
-        elif isinstance(selected_llm, list) and len(selected_llm) > 0:
-            selected_llm = str(selected_llm[0]).strip()
-        elif isinstance(selected_llm, str) and len(selected_llm.strip()) > 0:
-            selected_llm = selected_llm.strip()
-        else:
-            selected_llm = str(selected_llm).strip()
-            logging.warning(
-                f"Unexpected value type '{selected_llm}' for key 'llm' in config file. Continue anyway..."
-            )
+        selected_model, selected_model_config = self.get_selected_model_and_config(
+            selected_model
+        )
 
-        # Load selected LLM config from the list of llms in config file
-        selected_llm_config = self.config.get("llms", {}).get(selected_llm, None)
-
-        # Or load selected LLM config from the root of config file
-        if not selected_llm_config:
-            selected_llm_config = self.config.get(selected_llm, None)
-
-        if not selected_llm_config:
-            raise ValueError(f"LLM preset '{selected_llm}' not found in config file")
-        elif not isinstance(selected_llm_config, dict):
-            raise ValueError(f"LLM preset '{selected_llm}' is not a valid dictionary")
-
-        llm_provider = selected_llm_config.pop("provider", "llamacpp")
-        prompt_type = selected_llm_config.pop("prompt_type", None)
+        llm_provider = selected_model_config.pop("provider", "llamacpp")
+        prompt_type = selected_model_config.pop("prompt_type", None)
 
         match llm_provider:
             case "ollama":
                 # standarize model, model_id, model_name
-                if selected_llm_config["model"] is None:
-                    selected_llm_config["model"] = selected_llm_config.pop(
+                if selected_model_config["model"] is None:
+                    selected_model_config["model"] = selected_model_config.pop(
                         "model_id", None
-                    ) or selected_llm_config.pop("model_name", None)
+                    ) or selected_model_config.pop("model_name", None)
 
-                from langchain_community.chat_models import ChatOllama
+                if is_chat:
+                    from langchain_community.chat_models.ollama import ChatOllama
 
-                llm = ChatOllama(**selected_llm_config)
+                    llm = ChatOllama(**selected_model_config)
+                else:
+                    from langchain_community.llms.ollama import Ollama
+
+                    llm = Ollama(**selected_model_config)
             case "openai":
                 # standarize model, model_id, model_name
-                if selected_llm_config["model_name"] is None:
-                    selected_llm_config["model_name"] = selected_llm_config.pop(
+                if selected_model_config["model_name"] is None:
+                    selected_model_config["model_name"] = selected_model_config.pop(
                         "model_id", None
-                    ) or selected_llm_config.pop("model", None)
+                    ) or selected_model_config.pop("model", None)
 
-                from langchain_openai import ChatOpenAI
+                if is_chat:
+                    from langchain_openai import ChatOpenAI
 
-                llm = ChatOpenAI(**selected_llm_config)
+                    llm = ChatOpenAI(**selected_model_config)
+                else:
+                    from langchain_openai import OpenAI
+
+                    llm = OpenAI(**selected_model_config)
             case "llamacpp":
                 llm = self.load_llm_from_config(
-                    device_type=device_type, **selected_llm_config
+                    device_type=device_type, **selected_model_config
                 )
             case _:
                 raise ValueError(
@@ -103,6 +102,43 @@ class LLMFactory:
                 )
 
         return llm, prompt_type
+
+    def get_selected_model_and_config(
+        self, selected_model: Optional[str] = None
+    ) -> Tuple[str, Dict[str, Any]]:
+        if not selected_model:
+            selected_model = self.config.get("default_model", None)
+
+        if not selected_model:
+            raise ValueError("Key 'default_model' not found in config file")
+
+        if isinstance(selected_model, list) and len(selected_model) > 0:
+            selected_model = str(selected_model[0]).strip()
+        elif isinstance(selected_model, str) and len(selected_model.strip()) > 0:
+            selected_model = selected_model.strip()
+        else:
+            raise ValueError(
+                f"Invalid value '{selected_model}' in config's key 'default_model'"
+            )
+
+        # Load selected LLM config from the list of models in config file
+        selected_model_config = self.config.get("models", {}).get(selected_model, None)
+
+        # Or load selected LLM config from the root of config file
+        if not selected_model_config:
+            selected_model_config = self.config.get(selected_model, None)
+
+        if not selected_model_config:
+            raise ValueError(
+                f"Model preset '{selected_model}' not found in config file"
+            )
+        elif not isinstance(selected_model_config, dict):
+            raise ValueError(
+                f"Model preset '{selected_model}' is not a valid dictionary in config file"
+            )
+
+        # Return a cloned dictionary of the selected config
+        return selected_model, dict(selected_model_config)
 
     @classmethod
     def load_llm_from_config(
@@ -215,7 +251,7 @@ class LLMFactory:
                 )
                 logging.info("Using MPS for GGUF/GGML quantized models")
 
-            from langchain_community.llms import LlamaCpp
+            from langchain_community.llms.llamacpp import LlamaCpp
 
             llm = LlamaCpp(model_path=model_path, **kwargs)
 
@@ -226,7 +262,7 @@ class LLMFactory:
                 logging.info(
                     "If you were using GGML model, LLAMA-CPP Dropped Support, Use GGUF Instead"
                 )
-            return None
+            raise err
 
     @staticmethod
     def _load_quantized_model_qptq(model_id, model_basename, device_type, **kwargs):

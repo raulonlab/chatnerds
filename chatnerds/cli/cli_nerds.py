@@ -25,6 +25,21 @@ PODCAST_SOURCES_INITIAL_CONTENT = """
 
 NERD_CONFIG_INITIAL_CONTENT = """
 # Override default nerd config
+# See default config file in https://github.com/raulonlab/chatnerds/blob/main/chatnerds/config.yml",
+
+"""
+
+NERD_CONFIG_MODELS_INITIAL_CONTENT = """
+# Add custom models available to the nerd
+# See default models config file in https://github.com/raulonlab/chatnerds/blob/main/chatnerds/config.models.yml",
+# or run "chatnerds config models" to see all the models.
+
+"""
+
+NERD_CONFIG_PROMPTS_INITIAL_CONTENT = """
+# Customize the prompts used by the nerd.
+# See default prompts config file in https://github.com/raulonlab/chatnerds/blob/main/chatnerds/config.prompts.yml",
+# or run "chatnerds config prompts" to see the current prompts.
 
 """
 
@@ -46,10 +61,14 @@ def init_nerd(nerd_name: str):
     logging.debug(f"Initializing nerd '{nerd_name}'")
     nerd_path = Path(_global_config.NERDS_DIRECTORY_PATH, nerd_name)
     if nerd_path.exists():
-        logging.error(f"Nerd '{nerd_name}' already exists")
+        logging.warning(f"Nerd directory '{nerd_name}' already exists... skipping")
         return
     # nerd directory
     nerd_path.mkdir(parents=True, exist_ok=True)
+
+    # nerd store subdirectory
+    nerd_store_path = Path(nerd_path, Config._NERD_STORE_DIRECTORYNAME)
+    nerd_store_path.mkdir(parents=True, exist_ok=True)
 
     # nerd subdirectories
     Path(nerd_path, "downloads").mkdir(parents=True, exist_ok=True)
@@ -70,6 +89,14 @@ def init_nerd(nerd_name: str):
         Path(nerd_path, Config._NERD_CONFIG_FILENAME), "w", encoding="utf-8"
     ) as file:
         file.write(NERD_CONFIG_INITIAL_CONTENT)
+    with open(
+        Path(nerd_path, Config._NERD_CONFIG_MODELS_FILENAME), "w", encoding="utf-8"
+    ) as file:
+        file.write(NERD_CONFIG_MODELS_INITIAL_CONTENT)
+    with open(
+        Path(nerd_path, Config._NERD_CONFIG_PROMPTS_FILENAME), "w", encoding="utf-8"
+    ) as file:
+        file.write(NERD_CONFIG_PROMPTS_INITIAL_CONTENT)
 
     logging.info(f"Nerd '{nerd_name}' created")
 

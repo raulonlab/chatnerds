@@ -2,7 +2,7 @@
 # Audio transcriber: https://github.com/KostasEreksonas/Audio-transcriber/blob/main/transcriber.py
 # Translate transcribed text. Credit to Harsh Jain at educative.io: https://www.educative.io/answers/how-do-you-translate-text-using-python
 
-from typing import List, Optional, Dict, Tuple
+from typing import List, Optional, Dict, Tuple, Any
 import os
 from time import sleep
 import glob
@@ -12,8 +12,7 @@ import whisper
 import music_tag
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from chatnerds.config import Config
-from chatnerds.utils import check_for_package
-from chatnerds.langchain.summarizer import Summarizer
+from chatnerds.lib.helpers import check_for_package
 from chatnerds.tools.event_emitter import EventEmitter
 
 try:
@@ -27,7 +26,7 @@ _RUN_TASKS_LIMIT = 1_000  # Maximum number of tasks to run in a single call to r
 
 class AudioTranscriber(EventEmitter):
     config: Config = Optional[Config]
-    summarizer: Optional[Summarizer] = None
+    use_whipser_mps: bool = False
 
     def __init__(self, config: Config = None):
         super().__init__()
@@ -36,6 +35,14 @@ class AudioTranscriber(EventEmitter):
             self.config = config
         else:
             self.config = Config.environment_instance()
+
+        if not self.config.WHISPER_TRANSCRIPTION_MODEL_NAME:
+            raise ValueError(
+                "No transcription model name provided in 'config.WHISPER_TRANSCRIPTION_MODEL_NAME'"
+            )
+
+        if self.check_device() == "mps" and check_for_package("whisper_mps"):
+            self.use_whipser_mps = True
 
     def run(
         self,
@@ -86,6 +93,7 @@ class AudioTranscriber(EventEmitter):
                     "input_audio_file_path": str(audio_file),
                     "transcript_file_path": transcript_file_path,
                     "model_name": self.config.WHISPER_TRANSCRIPTION_MODEL_NAME,
+                    "use_whipser_mps": self.use_whipser_mps,
                 }
             )
 
@@ -102,7 +110,7 @@ class AudioTranscriber(EventEmitter):
             return [], []
 
         # Limit number of tasks to run
-        if not 1 < limit < _RUN_TASKS_LIMIT:
+        if not limit or not 0 < limit < _RUN_TASKS_LIMIT:
             limit = _RUN_TASKS_LIMIT
         if len(transcribe_audio_arguments) > limit:
             logging.warning(
@@ -111,8 +119,14 @@ class AudioTranscriber(EventEmitter):
             transcribe_audio_arguments = transcribe_audio_arguments[:limit]
 
         logging.debug(
-            f"Start processing {len(transcribe_audio_arguments)} audio files..."
+            f"Start transcribing {len(transcribe_audio_arguments)} audio files with model '{self.config.WHISPER_TRANSCRIPTION_MODEL_NAME}'..."
         )
+        if self.use_whipser_mps:
+            logging.debug("Using package 'whisper_mps' with device type 'MPS'...")
+        else:
+            logging.debug(
+                "Using package 'whisper' with device type 'CPU / GPU (No MPS)'..."
+            )
 
         # Emit start event (show progress bar in UI)
         self.emit("start", len(transcribe_audio_arguments))
@@ -154,14 +168,13 @@ class AudioTranscriber(EventEmitter):
         return results, errors
 
     @staticmethod
-    def transcribe_audio(input_arguments):
+    def transcribe_audio(input_arguments: Dict[str, Any]):
         input_audio_file_path = input_arguments["input_audio_file_path"]
         transcript_file_path = input_arguments["transcript_file_path"]
         model_name = input_arguments["model_name"]
+        use_whipser_mps: bool = input_arguments.get("use_whipser_mps", False)
 
-        if AudioTranscriber.check_device() == "mps" and check_for_package(
-            "whisper_mps"
-        ):
+        if use_whipser_mps:
             transcript = AudioTranscriber.transcribe_audio_using_mps(
                 input_audio_file_path=input_audio_file_path, model_name=model_name
             )
@@ -183,8 +196,8 @@ class AudioTranscriber(EventEmitter):
                     f'{tag_key}="{AudioTranscriber.escape_dotenv_value(tag_value)}"\n'
                 )
 
-        # Cool CPU a bit
-        sleep(1)
+        # Unblock system resources
+        sleep(0.2)
 
         return transcript_file_path
 
@@ -193,7 +206,6 @@ class AudioTranscriber(EventEmitter):
         """Transcribe audio file."""
 
         """Load speech recognition model."""
-        logging.debug(f"Loading model '{model_name}'...")
 
         # Whisper doesn't support MPS devices
         device = AudioTranscriber.check_device()
@@ -201,9 +213,6 @@ class AudioTranscriber(EventEmitter):
             device = "cpu"
         model = whisper.load_model(model_name, device=device)
 
-        logging.debug(
-            f"Transcribing audio using CPU / GPU (No MPS): '{input_audio_file_path}' ..."
-        )
         result = model.transcribe(
             input_audio_file_path,
         )
@@ -211,24 +220,23 @@ class AudioTranscriber(EventEmitter):
         # Free memory?
         model = None
 
-        """Put a newline character after each sentence in the transcript."""
-        formatted_text = result["text"].replace(". ", ".\n")
+        # Put a newline character after each sentence in the transcript.
+        # formatted_text = result["text"].replace(". ", ".\n")
 
-        return formatted_text
+        return result.get("text", "")
 
     @staticmethod
     def transcribe_audio_using_mps(input_audio_file_path: str, model_name: str):
         """Transcribe audio file."""
 
         """Get speech recognition model."""
-        logging.debug(f"Transcribing audio using MPS: '{input_audio_file_path}' ...")
 
         result = whispermps.transcribe(input_audio_file_path, model=model_name)
 
-        """Put a newline character after each sentence in the transcript."""
-        formatted_text = result["text"].replace(". ", ".\n")
+        # Put a newline character after each sentence in the transcript.
+        # formatted_text = result["text"].replace(". ", ".\n")
 
-        return formatted_text
+        return result.get("text", "")
 
     @staticmethod
     def find_audio_files(directory_path: str):
@@ -248,7 +256,7 @@ class AudioTranscriber(EventEmitter):
         }
 
     @staticmethod
-    def escape_dotenv_value(text: str) -> Dict[str, str]:
+    def escape_dotenv_value(text: str) -> str:
         """Strip characters and replace double quotes with single quotes."""
         return text.strip(' \n"').replace('"', "'")
 

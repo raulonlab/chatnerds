@@ -2,16 +2,20 @@
 .PHONY: clean help
 
 ## Dependencies
-### Install dependencies for MacOS (Metal device)
-install-metal:
-#	CMAKE_ARGS="-DLLAMA_METAL=on" FORCE_CMAKE=1 pip install --upgrade --force-reinstall --no-cache-dir llama-cpp-python 
-	CMAKE_ARGS="-DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_APPLE_SILICON_PROCESSOR=arm64 -DLLAMA_METAL=on" pip install --upgrade --force-reinstall --no-cache-dir llama-cpp-python
+### Install dependencies for MacOS (Metal device) using poetry
+### If python-llama-cpp fails, try to run `sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer`
+poetry-install-metal:
+	CMAKE_ARGS="-DLLAMA_METAL=on" FORCE_CMAKE=1 poetry run pip install --upgrade --force-reinstall --no-cache-dir llama-cpp-python 
+#	CMAKE_ARGS="-DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_APPLE_SILICON_PROCESSOR=arm64 -DLLAMA_METAL=on" poetry run pip install --upgrade --force-reinstall --no-cache-dir llama-cpp-python
+	poetry run pip install --upgrade whisper-mps
 
-### Install optional package whisper-mps
-poetry-install-whisper-mps:
-	poetry run pip install whisper-mps
+## Database tools
+fix-sqlite:
+	@find ./nerds/ -name "*.sqlite*" -exec sqlite3 {} vacuum \;
+#	@find . -name "nerds/**/.nerd_store/*.sqlite" -exec sqlite3 {} vacuum \;
+#	PRAGMA journal_mode=WAL;
 
-## Poetry commands
+## Code tools
 ### Export requirements.txt and requirements-dev.txt
 poetry-export-requirements:
 	@poetry export -f requirements.txt --output requirements.txt --without-hashes --without-urls --only main

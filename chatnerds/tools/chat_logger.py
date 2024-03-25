@@ -4,7 +4,7 @@ from datetime import datetime
 from chatnerds.config import Config
 
 CHAT_LOG_FILE = "chats.log"
-CONFIG_KEYS_TO_LOG = ["system_prompt", "llm", "retriever", "chat_chain"]
+CONFIG_KEYS_TO_LOG = ["default_model", "retriever", "chat_chain"]
 
 
 class ChatLogger:
@@ -91,10 +91,12 @@ class ChatLogger:
         cls, nerd_config: Dict[str, Any], line_prefix: Optional[str] = "  - "
     ) -> str:
         result_string = ""
-        if nerd_config.get("system_prompt"):
-            result_string += f"{line_prefix}system_prompt: {cls.one_line(nerd_config['system_prompt'])}\n"
-        if nerd_config.get("llm"):
-            result_string += f"{line_prefix}llm: {nerd_config['llm']}\n"
+        # if nerd_config.get("system_prompt"):
+        #     result_string += f"{line_prefix}system_prompt: {cls.one_line(nerd_config['system_prompt'])}\n"
+        if nerd_config.get("default_model"):
+            result_string += (
+                f"{line_prefix}default_model: {nerd_config['default_model']}\n"
+            )
         if nerd_config.get("retriever"):
             result_string += f"{line_prefix}retriever:\n"
             result_string += f"  {line_prefix}search_type: {nerd_config['retriever']['search_type']}\n"

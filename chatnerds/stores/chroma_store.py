@@ -1,65 +1,64 @@
 # Resources:
 # https://github.com/pprados/langchain-rag/blob/master/docs/integrations/vectorstores/rag_vectorstore.ipynb
 
-import os
 import logging
-from typing import List, Dict, Any, Tuple, Optional
-import chromadb
+from typing import List, Dict, Any, Optional
 import uuid
 from langchain_community.vectorstores.chroma import Chroma
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
 from chromadb.config import Settings
-from chatnerds.utils import divide_list_in_chunks
+from chatnerds.stores.store_base import StoreBase
+from chatnerds.lib.helpers import divide_list_in_chunks
 
 DEFAULT_CHUNKS_COLLECTION_NAME = "chatnerd_chunks"
-DEFAULT_PARENT_CHUNKS_COLLECTION_NAME = "chatnerd_parent_chunks"
-DEFAULT_SOURCES_COLLECTION_NAME = "chatnerd_sources"
 
 
 # Source: https://github.com/abasallo/rag/blob/master/vector_db/chroma_database.py
-class ChromaDatabase:
-    client: Chroma
-    collection: chromadb.Collection
-
+class ChromaStore(Chroma, StoreBase):
     def __init__(
         self,
         config: Dict[str, Any],
-        collection_name: str = DEFAULT_CHUNKS_COLLECTION_NAME,
-        embeddings: Embeddings | None = None,
+        collection_name: Optional[str] = DEFAULT_CHUNKS_COLLECTION_NAME,
+        embeddings: Optional[Embeddings] = None,
+        **kwargs: Any,
     ):
-        self.client = Chroma(
+        super().__init__(
             collection_name=collection_name,
             persist_directory=config["persist_directory"],
             embedding_function=embeddings,
             client_settings=Settings(**config),
+            **kwargs,
         )
-        self.collection = self.client.get()
 
-    def add_documents(self, documents: List[Document], **metadatas) -> List[str]:
-        try:
+    def add_documents(
+        self,
+        documents: List[Document],
+        extra_metadata: Dict[str, Any] = None,
+        **kwargs: Any,
+    ) -> List[str]:
+        if extra_metadata is not None:
             for document in documents:
-                for key, value in metadatas.items():
+                for key, value in extra_metadata.items():
                     document.metadata[key] = value
 
-            # Add documents to the database (in batches of size max_batch_size)
-            if hasattr(self.client._collection._client, "max_batch_size"):
-                max_batch_size = self.client._collection._client.max_batch_size
-            else:
-                max_batch_size = len(documents)
+        # Add documents to the database (in batches of size max_batch_size)
+        if hasattr(self._collection._client, "max_batch_size"):
+            max_batch_size = self._collection._client.max_batch_size
+        else:
+            max_batch_size = len(documents)
 
-            ids = []
-            for batch_documents in list(
-                divide_list_in_chunks(documents, max_batch_size)
-            ):
-                batch_ids = self.client.add_documents(batch_documents)
-                self.client.persist()
+        ids = []
+        for batch_documents in list(divide_list_in_chunks(documents, max_batch_size)):
+            batch_ids = super().add_documents(batch_documents, **kwargs)
 
-                ids.extend(batch_ids)
-            return ids
-        except ValueError as err:
-            logging.error(f"Error loading documents: \n{str(err)}")
-            return []
+            try:
+                self.persist()
+            except Exception as e:
+                logging.warning(f"Error persisting database client: \n{str(e)}")
+
+            ids.extend(batch_ids)
+        return ids
 
     def add_documents_with_embeddings(
         self,
@@ -86,7 +85,7 @@ class ChromaDatabase:
             ids = [str(uuid.uuid1()) for _ in page_contents]
 
         try:
-            self.client._collection.upsert(
+            self._collection.upsert(
                 metadatas=metadatas,
                 embeddings=embeddings,
                 documents=page_contents,
@@ -104,17 +103,12 @@ class ChromaDatabase:
 
         return ids
 
-    def find_similar_docs(
-        self, query: str, k: int = 4, with_score: bool = False
-    ) -> List[Document] | List[Tuple[Document, float]]:
-        if with_score:
-            return self.client.similarity_search_with_score(query, k)
-        else:
-            return self.client.similarity_search(query, k)
+    def is_thread_safe(self) -> bool:
+        return False
 
-    @staticmethod
-    def does_vectorstore_exist(persist_directory: str) -> bool:
-        """
-        Checks if vectorstore exists
-        """
-        return os.path.exists(os.path.join(persist_directory, "chroma.sqlite3"))
+    # def close(self):
+    #     Chroma(self)._client.clear_system_cache()
+
+    @classmethod
+    def does_vectorstore_exist(cls) -> bool:
+        return True

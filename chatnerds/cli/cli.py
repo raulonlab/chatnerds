@@ -7,9 +7,9 @@ from pathlib import Path
 from rich.console import Console
 from rich.syntax import Syntax
 from chatnerds.config import Config
-from chatnerds.logging_setup import setup as setup_logging
+from chatnerds.cli.logging_setup import setup as setup_logging
 from chatnerds.cli import cli_nerds, cli_sources, cli_tools, cli_utils, cli_db
-from chatnerds.utils import get_filtered_directories
+from chatnerds.lib.helpers import get_filtered_directories
 from chatnerds.tools.chat_logger import ChatLogger
 
 _global_config = Config.environment_instance()
@@ -38,6 +38,9 @@ app.registered_commands += cli_sources.app.registered_commands
 def main(ctx: typer.Context):
     if ctx.invoked_subcommand is None:
         app.show_help(ctx)
+
+    if ctx.command == "test":
+        print("Running test command...")
 
 
 @app.command(
@@ -131,6 +134,28 @@ def chat_command(
     chat(query=query)
 
 
+@app.command("retrieve", help="Retrieve relevant documents from a query")
+def retrieve_command(
+    query: Annotated[
+        str,
+        typer.Argument(help="Query used to retrieve relevant documents."),
+    ] = None,
+    summary: Annotated[
+        Optional[bool],
+        typer.Option(
+            "--summary",
+            "-s",
+            help="Print a summary of the documents retrieved.",
+        ),
+    ] = False,
+):
+    cli_utils.validate_confirm_active_nerd()
+
+    from chatnerds.retrieve import retrieve
+
+    retrieve(query=query, with_summary=summary)
+
+
 @app.command("review", help="Append a review value to the last chat log")
 def review_command(
     review_value: Annotated[
@@ -178,7 +203,7 @@ def env_command(
                     if default
                     else "# Current environment variables"
                 ),
-                "# See more info in https://github.com/raulonlab/chatnerds/blob/main/chatnerds/config.yml",
+                "# See more info in https://github.com/raulonlab/chatnerds/blob/main/.env_example",
                 str(Config.default_instance()) if default else str(_global_config),
             ]
         ),
@@ -189,20 +214,35 @@ def env_command(
 
 
 @app.command("config", help="Print the active nerd configuration (config.yml)")
-def config_command():
+def config_command(
+    section: Annotated[
+        Optional[str],
+        typer.Argument(help="Print only a specific section of the config"),
+    ] = None,
+):
 
-    console = Console()
+    nerd_config = _global_config.get_nerd_config()
+
+    if section:
+        if section in nerd_config:
+            nerd_config = {section: nerd_config[section]}
+        else:
+            logging.error(f"Section '{section}' not found in the active nerd config")
+            return
 
     config_yaml = yaml.safe_dump(
-        _global_config.get_nerd_config(),
+        nerd_config,
         stream=None,
         default_flow_style=False,
         sort_keys=False,
     )
+
     syntax = Syntax(
         "\n".join(
             [
-                "# Active configuration",
+                "# Active configuration {section_suffix}".format(
+                    section_suffix=f" - {section}" if section else ""
+                ),
                 "# See more info in https://github.com/raulonlab/chatnerds/blob/main/chatnerds/config.yml",
                 config_yaml,
             ]
@@ -210,6 +250,8 @@ def config_command():
         "yaml",
         line_numbers=False,
     )  # , theme="monokai"
+
+    console = Console()
     console.print(syntax)
 
 

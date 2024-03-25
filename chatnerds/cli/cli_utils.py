@@ -5,7 +5,7 @@ import typer
 from typer.core import TyperGroup
 from click import Context
 from tqdm import tqdm
-from chatnerds.enums import DownloadSourceEnum, LogColors
+from chatnerds.lib.enums import DownloadSourceEnum, LogColors
 from chatnerds.config import Config
 
 

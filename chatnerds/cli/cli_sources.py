@@ -1,7 +1,7 @@
 import logging
 import typer
 from pathlib import Path
-from chatnerds.enums import DownloadSourceEnum
+from chatnerds.lib.enums import DownloadSourceEnum
 from chatnerds.cli.cli_utils import (
     DownloadSourceOption,
     LimitOption,
@@ -10,7 +10,10 @@ from chatnerds.cli.cli_utils import (
     validate_confirm_active_nerd,
     TqdmHolder,
 )
-from chatnerds.utils import get_filtered_directories, copy_files_between_directories
+from chatnerds.lib.helpers import (
+    get_filtered_directories,
+    copy_files_between_directories,
+)
 from chatnerds.config import Config
 
 
@@ -26,8 +29,9 @@ def download_sources(source: DownloadSourceOption = None, limit: LimitOption = N
 
     validate_confirm_active_nerd()
 
-    # Local import of YoutubeDownloader
+    # Local import of YoutubeDownloader and PodcastDownloader
     from chatnerds.tools.youtube_downloader import YoutubeDownloader
+    from chatnerds.tools.podcast_downloader import PodcastDownloader
 
     try:
         if not source or source == DownloadSourceEnum.youtube:
@@ -53,8 +57,11 @@ def download_sources(source: DownloadSourceOption = None, limit: LimitOption = N
                 f"{len(results)} youtube audio files downloaded successfully with {len(errors)} errors...."
             )
 
-        # Local import of PodcastDownloader
-        from chatnerds.tools.podcast_downloader import PodcastDownloader
+            if len(errors) > 0:
+                logging.error(
+                    "Errors occurred while downloading audio files from youtube sources. Last error:\n",
+                    exc_info=errors[-1],
+                )
 
         if not source or source == DownloadSourceEnum.podcasts:
             podcast_downloader = PodcastDownloader(
@@ -112,8 +119,9 @@ def transcribe_downloads(
                 f"{'[Dry run] ' if dry_run else ''}{len(results)} audios transcribed successfully with {len(errors)} errors...."
             )
 
-            if dry_run == True:
-                return
+            # Despite dry_run, continue copying .transcript files to source_documents/ directory
+            # if dry_run == True:
+            #     return
 
             logging.info("Copying transcript files to source_documents/ ....")
 
@@ -122,7 +130,7 @@ def transcribe_downloads(
             )
 
             try:
-                copy_files_between_directories(
+                num_files_copied = copy_files_between_directories(
                     "**/*.transcript",
                     src_dir=Path(
                         _global_config.get_nerd_base_path(),
@@ -135,6 +143,8 @@ def transcribe_downloads(
                         source_directory_relative,
                     ),
                 )
+
+                logging.info(f"{num_files_copied} transcript files copied successfully")
             except Exception as e:
                 logging.error(
                     "Error moving transcript files to directory 'source_documents'",

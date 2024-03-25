@@ -1,8 +1,7 @@
 from chatnerds.config import Config
 
 # load and initialise config (Create nerds directory, etc)
-global_config = Config.environment_instance()
-global_config.bootstrap()
+Config.environment_instance().bootstrap()
 
 
 def run_cli():

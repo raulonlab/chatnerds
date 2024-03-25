@@ -53,13 +53,19 @@ def get_filtered_directories(
 
 def copy_files_between_directories(
     glob_search: str, src_dir: Path | str, dst_dir: Path | str
-):
+) -> int:
     src_dir = str(src_dir)
     dst_dir = str(dst_dir)
 
-    for src_file in glob.glob(glob_search, recursive=True, root_dir=src_dir):
+    file_counter = 0
+    for src_file in glob.iglob(glob_search, recursive=True, root_dir=src_dir):
         os.makedirs(os.path.join(dst_dir, os.path.dirname(src_file)), exist_ok=True)
-        shutil.copy(os.path.join(src_dir, src_file), os.path.join(dst_dir, src_file))
+        dst_file_path = os.path.join(dst_dir, src_file)
+        if not os.path.exists(dst_file_path):
+            shutil.copy(os.path.join(src_dir, src_file), dst_file_path)
+            file_counter += 1
+
+    return file_counter
 
 
 # borrowed from: https://stackoverflow.com/a/1051266/656011
@@ -82,9 +88,10 @@ def check_for_package(package):
 
 # Yield successive n-sized chunks from l.
 def divide_list_in_chunks(input_list: list, chunk_size: int):
+    input_len = len(input_list)
     # looping till length chunk_size
-    for i in range(0, len(input_list), chunk_size):
-        yield input_list[i : i + chunk_size]
+    for i in range(0, input_len, chunk_size):
+        yield input_list[i : i + min(input_len - i, chunk_size)]
 
 
 def process_memory_limit(limit):

@@ -1,18 +1,12 @@
 import os
 import logging
-from typing import Any, Dict, List, Optional, Tuple
-import uuid
-from time import sleep
+from typing import Any, Dict, List, Tuple
 from datetime import datetime, timezone
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from langchain_core.embeddings import Embeddings
 from langchain_core.documents import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from chatnerds.langchain.chroma_database import (
-    ChromaDatabase,
-    DEFAULT_SOURCES_COLLECTION_NAME,
-    DEFAULT_PARENT_CHUNKS_COLLECTION_NAME,
-)
+from chatnerds.stores.store_factory import StoreFactory
 from chatnerds.langchain.llm_factory import LLMFactory
 from chatnerds.tools.event_emitter import EventEmitter
 from chatnerds.config import Config
@@ -41,7 +35,7 @@ class DocumentEmbedder(EventEmitter):
             return [], []
 
         # Limit number of tasks to run
-        if not 1 < limit < _RUN_TASKS_LIMIT:
+        if not limit or not 0 < limit < _RUN_TASKS_LIMIT:
             limit = _RUN_TASKS_LIMIT
         if len(documents) > limit:
             logging.warning(
@@ -49,24 +43,19 @@ class DocumentEmbedder(EventEmitter):
             )
             documents = documents[:limit]
 
-        sources_database = ChromaDatabase(
-            collection_name=DEFAULT_SOURCES_COLLECTION_NAME,
-            config=self.config["chroma"],
-        )
-        parent_chunks_database = ChromaDatabase(
-            collection_name=DEFAULT_PARENT_CHUNKS_COLLECTION_NAME,
-            config=self.config["chroma"],
-        )
-        child_chunks_database = ChromaDatabase(config=self.config["chroma"])
-
         # Emit start event (show progress bar in UI)
         self.emit("start", len(documents))
 
+        # Maximum workers depending on vector store thread safety configuration
+        store = StoreFactory(self.config).get_vector_store()
+        if store.is_thread_safe():
+            max_workers = 2 if os.cpu_count() > 4 else 1
+        else:
+            max_workers = 1
+        store.close()
+
         results = []
         errors = []
-        max_workers = (
-            2 if os.cpu_count() > 4 else 1
-        )  # Maximum 2 workers (2 models loaded in memory at a time)
         with ProcessPoolExecutor(max_workers=max_workers) as executor:
             response_futures = [
                 executor.submit(self.split_and_embed_document, document)
@@ -77,50 +66,17 @@ class DocumentEmbedder(EventEmitter):
                 try:
                     response = response_future.result()
                     if response:
-                        # Add source documents to the database
-                        source_documents = response["documents_lists"][0]
-                        source_ids = response["ids_lists"][0]
-                        source_embeddings = response["embeddings_lists"][0]
-                        sources_database.add_documents_with_embeddings(
-                            documents=source_documents,
-                            ids=source_ids,
-                            embeddings=source_embeddings,
-                        )
-
-                        # Add parent documents to the database
-                        parent_documents = response["documents_lists"][1]
-                        parent_ids = response["ids_lists"][1]
-                        parent_embeddings = response["embeddings_lists"][1]
-                        parent_chunks_database.add_documents_with_embeddings(
-                            documents=parent_documents,
-                            ids=parent_ids,
-                            embeddings=parent_embeddings,
-                        )
-
-                        # Add child documents to the database
-                        child_documents = response["documents_lists"][2]
-                        child_ids = response["ids_lists"][2]
-                        child_embeddings = response["embeddings_lists"][2]
-                        child_chunks_database.add_documents_with_embeddings(
-                            documents=child_documents,
-                            ids=child_ids,
-                            embeddings=child_embeddings,
-                        )
-
-                        results.append(
-                            source_ids[0]
-                        )  # append the id of the source document
+                        results.append(response)  # append the id of the source document
 
                         try:
                             self.emit(
                                 "write",
-                                f"✔ {source_documents[0].metadata.get('source', '...')}",
+                                f"✔ {response}",
                             )
                         except:
                             pass
                 except Exception as err:
                     errors.append(err)
-                    continue
                 finally:
                     self.emit("update")
 
@@ -128,77 +84,55 @@ class DocumentEmbedder(EventEmitter):
         return results, errors
 
     @staticmethod
-    def split_and_embed_document(document: Document) -> Dict[str, List[any]]:
+    def split_and_embed_document(document: Document) -> str:
         config = Config().get_nerd_config()
         embeddings: Embeddings = LLMFactory(config).get_embedding_function()
 
-        child_splitter_config = {
+        chunk_splitter_config = {
             "separators": ["\n\n", "\n", ".", ",", " "],
             "keep_separator": False,
             "chunk_overlap": DEFAULT_CHUNK_OVERLAP,
             "chunk_size": DEFAULT_CHUNK_SIZE,
+            "add_start_index": True,
         } | config["splitter"]
 
         # fix chunk_size: It must be less than the model max sequence
-        child_splitter_config["chunk_size"] = min(
-            child_splitter_config["chunk_size"],
+        chunk_splitter_config["chunk_size"] = min(
+            chunk_splitter_config["chunk_size"],
             embeddings.client.get_max_seq_length(),
         )
-
-        # parent splitter config: twice the size of the child
-        parent_splitter_config = {
-            **child_splitter_config,
-            "chunk_size": 2 * child_splitter_config["chunk_size"],
-            "chunk_overlap": 2 * child_splitter_config["chunk_overlap"],
-        }
 
         # Add created_at metadata
         created_at_utc_iso = datetime.now(timezone.utc).isoformat()
         document.metadata["created_at"] = created_at_utc_iso
 
-        source_documents = [document]
-        source_ids = [str(uuid.uuid1())]
-
-        parent_chunks, parent_chunk_ids = DocumentEmbedder.split_documents(
-            source_documents,
-            parent_ids=source_ids,
-            splitter_kwargs=parent_splitter_config,
+        chunks = DocumentEmbedder.split_documents(
+            [document],
+            splitter_kwargs=chunk_splitter_config,
         )
 
-        child_chunks, child_chunk_ids = DocumentEmbedder.split_documents(
-            parent_chunks,
-            parent_ids=parent_chunk_ids,
-            splitter_kwargs=child_splitter_config,
-        )
+        store_factory = StoreFactory(config)
+        chunks_database = store_factory.get_vector_store(embeddings=embeddings)
 
-        documents_lists = [source_documents, parent_chunks, child_chunks]
-        ids_lists = [source_ids, parent_chunk_ids, child_chunk_ids]
+        # Embbed and store chunk documents
+        chunk_ids = chunks_database.add_documents(documents=chunks)
 
-        embeddings_lists = []
-        for (
-            documents
-        ) in documents_lists:  # iterate over source, parent, and child documents
-            embeddings_lists.append(
-                embeddings.embed_documents(
-                    [document.page_content for document in documents]
-                )
+        # Save source document in status store
+        with store_factory.get_status_store() as status_store:
+            status_store.add_studied_document(
+                id=document.metadata.get("source", None),
+                source=document.metadata.get("source", None),
+                page_content=document.page_content,
+                metadata=document.metadata,
             )
 
-        # Cool CPU a bit
-        sleep(1)
-
-        return {
-            "documents_lists": documents_lists,
-            "ids_lists": ids_lists,
-            "embeddings_lists": embeddings_lists,
-        }
+        return document.metadata.get("source", None)
 
     @staticmethod
     def split_documents(
         documents: List[Document],
-        parent_ids: Optional[List[str]] = None,
         splitter_kwargs: Dict[str, Any] = {},
-    ) -> Tuple[List[Document], List[str]]:
+    ) -> List[Document]:
         """
         Load documents and split in chunks
         """
@@ -215,21 +149,10 @@ class DocumentEmbedder(EventEmitter):
         )  # .from_tiktoken_encoder
 
         texts, metadatas = [], []
-        for index, document in enumerate(documents):
+        for document in documents:
             texts.append(document.page_content)
-            metadatas.append(
-                {
-                    **document.metadata,
-                    "parent_id": (
-                        parent_ids[index]
-                        if (parent_ids and len(parent_ids) > index)
-                        else None
-                    ),
-                }
-            )
+            metadatas.append(document.metadata)
+
         chunks = text_splitter.create_documents(texts, metadatas=metadatas)
 
-        # Generate chunk ids
-        chunk_ids = [str(uuid.uuid1()) for _ in chunks]
-
-        return chunks, chunk_ids
+        return chunks

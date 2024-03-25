@@ -12,10 +12,6 @@ If run, this module illustrates the usage of the duallog package.
 import logging.handlers
 from typing import Union
 
-# Define default logfile format.
-file_name_format = (
-    "{year:04d}{month:02d}{day:02d}-" "{hour:02d}{minute:02d}{second:02d}.log"
-)
 
 # Define the default logging message formats.
 file_msg_format = "%(asctime)s %(levelname)-8s: %(message)s"
@@ -57,23 +53,6 @@ def setup(
     # Create the root logger.
     logger = logging.getLogger()
     logger.setLevel(logging.DEBUG)
-
-    # # Validate the given directory.
-    # dir = os.path.normpath(dir)
-
-    # # Create a folder for the logfiles.
-    # if not os.path.exists(dir):
-    #     os.makedirs(dir)
-
-    # # Construct the name of the logfile.
-    # t = datetime.datetime.now()
-    # file_name = file_name_format.format(year=t.year, month=t.month, day=t.day,
-    #     hour=t.hour, minute=t.minute, second=t.second)
-    # file_name = os.path.join(dir, file_name)
-
-    # Set up logging to the logfile.
-    # file_handler = logging.handlers.RotatingFileHandler(
-    #     filename=file_name, maxBytes=max_bytes, backupCount=backup_count)
 
     if log_file_level is not None and log_file_level != logging.NOTSET:
         file_handler = logging.handlers.TimedRotatingFileHandler(
