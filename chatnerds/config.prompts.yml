@@ -1,9 +1,16 @@
 # Default prompt presets for nerds
 
 chat_system_prompt: >
-  You are an assistant for question-answering tasks. 
-  Use the following pieces of context to answer the question at the end. 
+  You are an assistant for question-answering tasks.
   If you don't know the answer, just say that you don't know. Don't try to make up an answer. Think step by step.
+
+chat_human_prompt: >
+  Use the following pieces of context to answer the question at the end.
+  -------
+  {context}
+  -------
+
+  Question: {text}
 
 summary_system_prompt: |
   IDENTITY and PURPOSE:
@@ -26,7 +33,6 @@ summary_system_prompt: |
   3. Do not repeat ideas, quotes, facts, or resources.
   4. Do not start items with the same opening words.
   
-
 summary_human_prompt: |
   CONTENT:
   
@@ -80,7 +86,6 @@ refine_system_prompt: |
   1. Keep the same sections as the existing summary.
   2. If the context isn't useful, return the existing summary and ONLY the existing summary.
   
-
 refine_human_prompt: |
   EXISTING SUMMARY:
   
@@ -90,12 +95,24 @@ refine_human_prompt: |
   
   {text}
 
+
 find_expanded_questions_prompt: |
-  You are an AI language model assistant. Your task is to generate {n_expanded_questions} different versions of the given user question to retrieve relevant documents from a vector database. The response should be a numbered list with each item on a new line. Question: {text}
+  You are an AI language model assistant. Your task is to generate {n_expanded_questions} different versions of the given user question to retrieve relevant documents from a vector database. 
+  
+  This is the initial question:
+  -------
+  {text}
+  -------
+
+  Provide {n_expanded_questions} different versions of the question numbered in different lines, with no explanations.
+
 
 find_tags_prompt: |
-  You are a classification and tagging assistant. Your task is to generate {n_tags} different tags for the given user text to help to classify the document in clusters. {format_instructions}.
-  
-  Text:
-  {text}
+  You are a classification and tagging assistant. Your task is to generate {n_tags} tags of the given document to classify it in clusters.
 
+  This is the document:
+  -------
+  {text}
+  -------
+
+  Provide {n_tags} different tags for the document. Your response should be a comma-separated list of values, with no additional punctuations and no explanations, e.g., `foo, bar, baz`

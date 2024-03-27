@@ -3,7 +3,7 @@
 
 ## Dependencies
 ### Install dependencies for MacOS (Metal device) using poetry
-### If python-llama-cpp fails, try to run `sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer`
+### If llama-cpp-python fails, try to run `sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer`
 poetry-install-metal:
 	CMAKE_ARGS="-DLLAMA_METAL=on" FORCE_CMAKE=1 poetry run pip install --upgrade --force-reinstall --no-cache-dir llama-cpp-python 
 #	CMAKE_ARGS="-DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_APPLE_SILICON_PROCESSOR=arm64 -DLLAMA_METAL=on" poetry run pip install --upgrade --force-reinstall --no-cache-dir llama-cpp-python

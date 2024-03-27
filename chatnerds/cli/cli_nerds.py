@@ -25,21 +25,21 @@ PODCAST_SOURCES_INITIAL_CONTENT = """
 
 NERD_CONFIG_INITIAL_CONTENT = """
 # Override default nerd config
-# See default config file in https://github.com/raulonlab/chatnerds/blob/main/chatnerds/config.yml",
+# See default config file in https://github.com/raulonlab/chatnerds/blob/main/chatnerds/config.yml,
 
 """
 
 NERD_CONFIG_MODELS_INITIAL_CONTENT = """
-# Add custom models available to the nerd
-# See default models config file in https://github.com/raulonlab/chatnerds/blob/main/chatnerds/config.models.yml",
-# or run "chatnerds config models" to see all the models.
+# Add custom model presets available to your nerd
+# See initial presets in https://github.com/raulonlab/chatnerds/blob/main/chatnerds/config.models.yml,
+# or run "chatnerds config models" to see the complete list.
 
 """
 
 NERD_CONFIG_PROMPTS_INITIAL_CONTENT = """
-# Customize the prompts used by the nerd.
-# See default prompts config file in https://github.com/raulonlab/chatnerds/blob/main/chatnerds/config.prompts.yml",
-# or run "chatnerds config prompts" to see the current prompts.
+# Change the prompts used by the nerd.
+# See default prompts in https://github.com/raulonlab/chatnerds/blob/main/chatnerds/config.prompts.yml,
+# or run "chatnerds config prompts" to see the active ones.
 
 """
 
@@ -49,7 +49,7 @@ app = typer.Typer()
 
 @app.command(
     "init",
-    help="Initialize a new nerd. A nerd is a collection of sources and documents",
+    help="Create and initialize a new nerd with the given name",
 )
 def init_nerd(nerd_name: str):
     if not validate_nerd_name(nerd_name):

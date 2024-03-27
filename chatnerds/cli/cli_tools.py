@@ -11,12 +11,12 @@ import glob
 from langchain_community.document_loaders.youtube import YoutubeLoader
 from langchain_core.tracers.stdout import ConsoleCallbackHandler
 from chatnerds.cli.cli_utils import (
+    grep_match,
+    LimitOption,
     OrderedCommandsTyperGroup,
     UrlFilterArgument,
     validate_confirm_active_nerd,
 )
-from chatnerds.langchain.llm_factory import LLMFactory
-from chatnerds.langchain.chain_factory import ChainFactory
 from chatnerds.config import Config
 
 
@@ -98,8 +98,12 @@ def transcribe_youtube_command(
         raise typer.Abort()
 
 
-@app.command("summarize")
-def summarize_command(input_file_path: Optional[str] = None):
+@app.command("summarize-transcript", help="Summarize transcript file")
+def summarize_transcript_command(input_file_path: Optional[str] = None):
+    if input_file_path and not os.path.exists(input_file_path):
+        logging.error(f"File '{input_file_path}' does not exist")
+        raise typer.Abort()
+
     nerd_config = _global_config.get_nerd_config()
 
     if not input_file_path:
@@ -107,7 +111,7 @@ def summarize_command(input_file_path: Optional[str] = None):
             _global_config.get_nerd_base_path(), "source_documents"
         )
         source_files_iterator = glob.iglob(
-            "**/*.*", root_dir=glob_root_dir, recursive=True
+            "**/*.transcript", root_dir=glob_root_dir, recursive=True
         )
 
         fzf = FzfPrompt()
@@ -122,13 +126,16 @@ def summarize_command(input_file_path: Optional[str] = None):
 
         input_file_path = os.path.join(glob_root_dir, selected_source_files[0])
 
-    # Local import of TranscriptLoader
+    if not os.path.basename(input_file_path).endswith(".transcript"):
+        logging.error("Only .transcript files supported...")
+        raise typer.Abort()
+
+    # Local imports
+    from chatnerds.langchain.llm_factory import LLMFactory
+    from chatnerds.langchain.summarizer import Summarizer
     from chatnerds.document_loaders.transcript_loader import TranscriptLoader
 
     transcript_documents = TranscriptLoader(input_file_path).load()
-
-    # Local import of Summarizer
-    from chatnerds.langchain.summarizer import Summarizer
 
     llm, prompt_type = LLMFactory(config=nerd_config).get_summarize_model()
     summarizer = Summarizer(
@@ -149,16 +156,25 @@ def summarize_command(input_file_path: Optional[str] = None):
     )
 
 
-@app.command("tag")
-def tag_command(input_file_path: Optional[str] = None):
+@app.command("tag-transcript", help="Find tags of transcript file")
+def tag_transcript_command(input_file_path: Optional[str] = None):
+    if input_file_path and not os.path.exists(input_file_path):
+        logging.error(f"File '{input_file_path}' does not exist")
+        raise typer.Abort()
+
     nerd_config = _global_config.get_nerd_config()
+
+    # Local imports
+    from chatnerds.langchain.llm_factory import LLMFactory
+    from chatnerds.langchain.tagger import Tagger
+    from chatnerds.document_loaders.transcript_loader import TranscriptLoader
 
     if not input_file_path:
         glob_root_dir = os.path.join(
             _global_config.get_nerd_base_path(), "source_documents"
         )
         source_files_iterator = glob.iglob(
-            "**/*.*", root_dir=glob_root_dir, recursive=True
+            "**/*.transcript", root_dir=glob_root_dir, recursive=True
         )
 
         fzf = FzfPrompt()
@@ -173,13 +189,11 @@ def tag_command(input_file_path: Optional[str] = None):
 
         input_file_path = os.path.join(glob_root_dir, selected_source_files[0])
 
-    # Local import of TranscriptLoader
-    from chatnerds.document_loaders.transcript_loader import TranscriptLoader
+    if not os.path.basename(input_file_path).endswith(".transcript"):
+        logging.error("Only .transcript files supported...")
+        raise typer.Abort()
 
     transcript_documents = TranscriptLoader(input_file_path).load()
-
-    # Local import of Tagger
-    from chatnerds.langchain.tagger import Tagger
 
     llm, prompt_type = LLMFactory(config=nerd_config).get_summarize_model()
     tagger = Tagger(
@@ -191,10 +205,10 @@ def tag_command(input_file_path: Optional[str] = None):
     )
 
     rprint(f"Tagging file '{input_file_path}'...")
-    tags = tagger.tag_text(transcript_documents[0].page_content)
+    texts_tags = tagger.find_tags([transcript_documents[0].page_content], n_tags=5)
 
-    if isinstance(tags, str):
-        tags = tags.split(",")
+    if isinstance(texts_tags, list) and len(texts_tags) > 0:
+        tags = tags[0]
 
     if isinstance(tags, list):
         tags_str = ", ".join(tags)
@@ -205,6 +219,196 @@ def tag_command(input_file_path: Optional[str] = None):
         Panel(
             f"{tags_str}",
             title="Tags",
+            title_align="left",
+        )
+    )
+
+
+@app.command(
+    "tag-cluster-titles",
+    help="Find tags of studied documents clusterized by similar titles",
+)
+def tag_cluster_titles_command(
+    grep: Annotated[
+        str,
+        typer.Option(
+            "--grep",
+            "-g",
+            case_sensitive=False,
+            help="Filter studied documents by a string",
+        ),
+    ],
+):
+    validate_confirm_active_nerd(skip_confirmation=True)
+
+    nerd_config = _global_config.get_nerd_config()
+
+    # Local imports
+    from chatnerds.langchain.llm_factory import LLMFactory
+    from chatnerds.stores.store_factory import StoreFactory
+    from chatnerds.langchain.tagger import Tagger
+
+    store_factory = StoreFactory(nerd_config)
+
+    studied_documents = []
+    with store_factory.get_status_store() as status_store:
+        studied_documents = status_store.get_studied_documents()
+
+    sources = []
+    titles = []
+    for studied_document in studied_documents:
+        metadata = studied_document.get("metadata", {})
+        source = studied_document.get("source", "")
+        if grep and not grep_match(
+            grep,
+            source,
+            # metadata.get("artist", ""),
+            metadata.get("title", ""),
+            metadata.get("album", ""),
+        ):
+            continue
+
+        title = metadata.get("title", "")
+        if not title:
+            continue
+
+        # Format title
+        title = title.strip(" .\n").capitalize()
+
+        titles.append(title)
+        sources.append(str(source))
+
+    if len(titles) == 0:
+        print("No source selected. Exiting...")
+        return
+
+    llm_factory = LLMFactory(nerd_config)
+    embeddings_function = llm_factory.get_embedding_function()
+
+    embeddings = embeddings_function.embed_documents(titles)
+
+    llm, prompt_type = llm_factory.get_summarize_model()
+    tagger = Tagger(
+        nerd_config,
+        llm=llm,
+        prompt_type=prompt_type,
+    )
+    tags_by_clusters = tagger.find_clusterized_tags(texts=titles, embeddings=embeddings)
+
+    if not isinstance(tags_by_clusters, list):
+        tags_by_clusters = [tags_by_clusters]
+
+    tags_by_clusters_str = ""
+    for cluster_i, tags in enumerate(tags_by_clusters):
+        tags_by_clusters_str += f"Cluster {cluster_i + 1}:\n"
+        if not isinstance(tags, list):
+            tags = [tags]
+
+        tags_by_clusters_str += "\n".join([f"- {tag}" for tag in tags])
+        tags_by_clusters_str += "\n\n"
+
+    rprint(
+        Panel(
+            f"{tags_by_clusters_str}",
+            title="Tags by clusters of titles",
+            title_align="left",
+        )
+    )
+
+
+@app.command(
+    "tag-cluster-contents",
+    help="Find tags of studied documents clusterized by similar chunks",
+)
+def tag_cluster_contents_command(
+    grep: Annotated[
+        str,
+        typer.Option(
+            "--grep",
+            "-g",
+            case_sensitive=False,
+            help="Filter studied documents by a string",
+        ),
+    ],
+    limit: LimitOption = None,
+):
+    validate_confirm_active_nerd(skip_confirmation=True)
+
+    nerd_config = _global_config.get_nerd_config()
+
+    # Local imports
+    from chatnerds.langchain.llm_factory import LLMFactory
+    from chatnerds.stores.store_factory import StoreFactory
+    from chatnerds.langchain.tagger import Tagger
+
+    llm_factory = LLMFactory(nerd_config)
+    embeddings_function = llm_factory.get_embedding_function()
+
+    chunks_store = StoreFactory(nerd_config).get_vector_store(
+        embeddings=embeddings_function
+    )
+
+    # Get chunk chunks collection
+    chunks_collection = chunks_store.get(
+        # where={"source": input_file_path},
+        include=["documents", "metadatas", "embeddings"],
+    )
+
+    texts = []
+    embeddings = []
+    for text_i, text in enumerate(chunks_collection["documents"]):
+        metadata = chunks_collection["metadatas"][text_i]
+        embedding = chunks_collection["embeddings"][text_i]
+        source = metadata.get("source", "")
+        if grep and not grep_match(
+            grep,
+            source,
+            # metadata.get("artist", ""),
+            metadata.get("title", ""),
+            metadata.get("album", ""),
+        ):
+            continue
+
+        # Format text
+        text = text.strip(" .\n")
+
+        texts.append(text)
+        embeddings.append(embedding)
+
+        if limit and len(texts) >= limit:
+            break
+
+    if len(texts) == 0:
+        print("No documents found. Exiting...")
+        return
+
+    llm, prompt_type = llm_factory.get_summarize_model()
+    tagger = Tagger(
+        nerd_config,
+        llm=llm,
+        prompt_type=prompt_type,
+    )
+    tags_by_clusters = tagger.find_clusterized_tags(
+        texts=texts,
+        embeddings=embeddings,
+        combine_texts_separator="...\n\n",
+    )
+    if not isinstance(tags_by_clusters, list):
+        tags_by_clusters = [tags_by_clusters]
+
+    tags_by_clusters_str = ""
+    for cluster_i, tags in enumerate(tags_by_clusters):
+        tags_by_clusters_str += f"Cluster {cluster_i + 1}:\n"
+        if not isinstance(tags, list):
+            tags = [tags]
+
+        tags_by_clusters_str += "\n".join([f"- {tag}" for tag in tags])
+        tags_by_clusters_str += "\n\n"
+
+    rprint(
+        Panel(
+            f"{tags_by_clusters_str}",
+            title="Tags by clusters of chunks",
             title_align="left",
         )
     )
@@ -227,6 +431,9 @@ def find_expanded_questions_command(
         raise ValueError(
             f"Invalid value in 'retrieve_chain' configuration: {retrieve_chain_config}"
         )
+
+    # Local imports
+    from chatnerds.langchain.chain_factory import ChainFactory
 
     question_expansion_chain = ChainFactory(nerd_config).get_question_expansion_chain(
         retrieve_chain_config
@@ -290,7 +497,7 @@ def search_command(
 
     nerd_config = _global_config.get_nerd_config()
 
-    # Local import of LLMFactory
+    # Local imports
     from chatnerds.langchain.llm_factory import LLMFactory
 
     embeddings = LLMFactory(config=nerd_config).get_embedding_function()

@@ -28,7 +28,6 @@ openai-whisper = {git = "https://github.com/openai/whisper.git", tag = "v2023111
 # whisper-mps = { version = "^0.0.7", python = ">=3.11" }
 typing-extensions = ">=4.4.0,<5.0.0"
 python-dotenv = "^0.19.2"
-typer = {extras = ["all"], version = ">=0.9.0,<1.0.0"}
 tqdm = ">=4.64.1,<5.0.0"
 rich = "^13.0.1"
 requests = "^2.31.0"
@@ -47,6 +46,7 @@ pandoc = "^2.3"
 pyfzf = "^0.3.1"
 youtube-transcript-api = "^0.6.2"
 qdrant-client = "^1.8.0"
+hdbscan = "^0.8.33"
 
 [tool.poetry.group.dev.dependencies]
 deptry = "*"

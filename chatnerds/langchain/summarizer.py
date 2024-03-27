@@ -113,11 +113,11 @@ class Summarizer:
         )
 
         if summary_system_prompt:
-            map_prompt = PromptFactory().get_system_human_prompt(
-                llm=llm,
+            map_prompt = PromptFactory.build_prompt_template(
                 system_prompt=summary_system_prompt,
-                human_prompt=summary_human_prompt,
+                human_prompt=summary_human_prompt or "{text}",
                 prompt_type=prompt_type,
+                input_variables=["text"],
             )
         else:
             intro = "The following is a set of documents"
@@ -135,11 +135,11 @@ class Summarizer:
             map_prompt = PromptTemplate.from_template(map_template)
 
         if combine_system_prompt:
-            combine_prompt = PromptFactory().get_system_human_prompt(
-                llm=llm,
+            combine_prompt = PromptFactory.build_prompt_template(
                 system_prompt=combine_system_prompt,
-                human_prompt=combine_human_prompt,
+                human_prompt=combine_human_prompt or "{text}",
                 prompt_type=prompt_type,
+                input_variables=["text"],
             )
 
         else:
@@ -183,11 +183,11 @@ class Summarizer:
         )
 
         if summary_system_prompt:
-            initial_prompt = PromptFactory().get_system_human_prompt(
-                llm=llm,
+            initial_prompt = PromptFactory.build_prompt_template(
                 system_prompt=summary_system_prompt,
-                human_prompt=summary_human_prompt,
+                human_prompt=summary_human_prompt or "{text}",
                 prompt_type=prompt_type,
+                input_variables=["text"],
             )
         else:
             initial_template = """
@@ -200,11 +200,11 @@ class Summarizer:
             initial_prompt = PromptTemplate.from_template(initial_template)
 
         if refine_system_prompt:
-            refine_prompt = PromptFactory().get_system_human_prompt(
-                llm=llm,
+            refine_prompt = PromptFactory.build_prompt_template(
                 system_prompt=refine_system_prompt,
-                human_prompt=refine_human_prompt,
+                human_prompt=refine_human_prompt or "{text}",
                 prompt_type=prompt_type,
+                input_variables=["text"],
             )
         else:
             refine_template = """
@@ -247,11 +247,11 @@ class Summarizer:
         )
 
         if summary_system_prompt:
-            summarize_prompt = PromptFactory().get_system_human_prompt(
-                llm=llm,
+            summarize_prompt = PromptFactory.build_prompt_template(
                 system_prompt=summary_system_prompt,
-                human_prompt=summary_human_prompt,
+                human_prompt=summary_human_prompt or "{text}",
                 prompt_type=prompt_type,
+                input_variables=["text"],
             )
         else:
             template = """

@@ -81,7 +81,7 @@ def download_sources(source: DownloadSourceOption = None, limit: LimitOption = N
 
 @app.command(
     "transcribe-downloads",
-    help="Transcribe downloaded audio files into transcript files (.transcript)",
+    help="Transcribe downloaded audio files into transcript files (.transcript) and copy them to 'source_documents' directory",
 )
 def transcribe_downloads(
     directory_filter: DirectoryFilterArgument = None,

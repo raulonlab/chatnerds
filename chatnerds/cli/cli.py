@@ -27,7 +27,6 @@ setup_logging(
 
 app = typer.Typer(cls=cli_utils.OrderedCommandsTyperGroup, no_args_is_help=True)
 
-
 # Import commands from other modules
 app.registered_commands += cli_nerds.app.registered_commands
 app.registered_commands += cli_sources.app.registered_commands
@@ -45,7 +44,7 @@ def main(ctx: typer.Context):
 
 @app.command(
     "study",
-    help="Start studying (ingesting) the source documents and save the embeddings in the local DB",
+    help="Start studying documents in 'source_documents' directory (embed and store documents in vector DB)",
 )
 def study_command(
     directory_filter: cli_utils.DirectoryFilterArgument = None,
@@ -118,7 +117,7 @@ def study_command(
         raise typer.Abort()
 
 
-@app.command("chat", help="Start an interactive chat session with your active nerd")
+@app.command("chat", help="Start a chat session with your active nerd")
 def chat_command(
     query: Annotated[
         Optional[str],
@@ -134,7 +133,10 @@ def chat_command(
     chat(query=query)
 
 
-@app.command("retrieve", help="Retrieve relevant documents from a query")
+@app.command(
+    "retrieve",
+    help="Retrieve relevant documents of a query and optionally generate a summary of the documents.",
+)
 def retrieve_command(
     query: Annotated[
         str,
@@ -145,7 +147,7 @@ def retrieve_command(
         typer.Option(
             "--summary",
             "-s",
-            help="Print a summary of the documents retrieved.",
+            help="Enable / disable generating a summary of the retrieved documents",
         ),
     ] = False,
 ):
@@ -258,15 +260,13 @@ def config_command(
 app.add_typer(
     cli_tools.app,
     name="tools",
-    help="Other tools",
-    short_help="Other tools",
+    help="Miscellaneous tools",
     epilog="* These tools work independently of your active nerd environment.",
 )
 
 app.add_typer(
     cli_db.app,
     name="db",
-    help="Other commands related with the local DB",
-    short_help="Other commands related with the local DB",
+    help="View and manage the local DBs",
     epilog="* These commands require an active nerd environment.",
 )

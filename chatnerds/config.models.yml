@@ -1,4 +1,4 @@
-# Default model presets for nerds
+# Initial model presets for nerds
 
 openai-gpt-3.5-turbo:
   provider: openai
@@ -70,7 +70,7 @@ mistral-7b-instruct-v0.1-gguf:
   prompt_type: mistral
   model_id: TheBloke/Mistral-7B-Instruct-v0.1-GGUF
   model_basename: mistral-7b-instruct-v0.1.Q4_K_M.gguf
-  temperature: 0.8
+  temperature: 0.2
   # top_p: 0.95
   n_ctx: 16000  # 16000
   # max_tokens: 8192  # 4096
@@ -97,7 +97,7 @@ mistral-7b-instruct-v0.2-gguf:
 
 mistral-7b-openhermes-gguf:  # https://huggingface.co/TheBloke/OpenHermes-2.5-Mistral-7B-GGUF
   provider: llamacpp
-  prompt_type: mistral
+  # prompt_type: mistral
   model_id: TheBloke/OpenHermes-2.5-Mistral-7B-GGUF
   model_basename: openhermes-2.5-mistral-7b.Q4_K_M.gguf
   # https://github.com/langchain-ai/langchain/blob/master/libs/langchain/langchain/llms/llamacpp.py

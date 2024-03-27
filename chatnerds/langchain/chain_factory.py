@@ -1,7 +1,6 @@
 from typing import Any, Dict, Optional
 from operator import itemgetter
 from langchain.llms.base import LLM as LLMBase
-from langchain.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser, NumberedListOutputParser
 from langchain.chains.base import Chain
 from langchain.chains import RetrievalQA
@@ -21,7 +20,15 @@ from chatnerds.langchain.chain_runnables import (
     combine_documents_runnable,
 )
 from chatnerds.langchain.prompt_factory import PromptFactory
-from chatnerds.lib.constants import DEFAULT_CHAT_SYSTEM_PROMPT
+
+
+DEFAULT_CHAT_PROMPT = """
+<context>
+{context}
+</context>
+
+Question: {question}
+"""
 
 
 class ChainFactory:
@@ -41,13 +48,17 @@ class ChainFactory:
 
         llm, prompt_type = LLMFactory(config=self.config).get_model()
 
-        chat_system_prompt: str = self.config["prompts"].get(
-            "chat_system_prompt", DEFAULT_CHAT_SYSTEM_PROMPT
+        chat_system_prompt: str = self.config["prompts"].get("chat_system_prompt", None)
+        chat_human_prompt: str = self.config["prompts"].get(
+            "chat_human_prompt", DEFAULT_CHAT_PROMPT
         )
         chat_system_prompt = chat_system_prompt.replace("\n", " ").strip(". ")
 
-        qa_prompt = PromptFactory().get_rag_prompt(
-            llm=llm, system_prompt=chat_system_prompt, prompt_type=prompt_type
+        qa_prompt = PromptFactory.build_prompt_template(
+            system_prompt=chat_system_prompt,
+            human_prompt=chat_human_prompt,
+            prompt_type=prompt_type,
+            input_variables=["context", "question"],
         )
 
         chat_chain_config = self.config.get("chat_chain", None)
@@ -196,14 +207,6 @@ class ChainFactory:
         if not llm:
             llm, prompt_type = LLMFactory(config=self.config).get_model(is_chat=False)
 
-        prompt_template = self.config["prompts"].get(
-            "find_expanded_questions_prompt", None
-        )
-        if not prompt_template:
-            raise ValueError(
-                "Invalid value in 'find_expanded_questions_prompt' configuration"
-            )
-
         n_expanded_questions = chain_config.get("n_expanded_questions", None)
         if not n_expanded_questions or n_expanded_questions < 1:
             return RunnableLambda(lambda input: [input])
@@ -211,10 +214,14 @@ class ChainFactory:
         output_parser = NumberedListOutputParser()
         # format_instructions = output_parser.get_format_instructions().replace("\n\n", "\n")
 
-        # Provide these alternative questions separated by new lines.
-        question_expansion_prompt = PromptFactory().format_prompt_template(
-            llm=llm,
-            prompt=prompt_template,
+        prompt = self.config["prompts"].get("find_expanded_questions_prompt", None)
+        if not prompt:
+            raise ValueError(
+                "Invalid value in 'find_expanded_questions_prompt' configuration"
+            )
+
+        question_expansion_prompt = PromptFactory.build_prompt_template(
+            human_prompt=prompt,
             prompt_type=prompt_type,
             input_variables=["text"],
             partial_variables={
@@ -241,24 +248,20 @@ class ChainFactory:
         retrieve_store = store_factory.get_vector_store(embeddings=embeddings)
 
         retriever = retrieve_store.as_retriever(**self.config["retriever"])
-        llm, _ = LLMFactory(config=self.config).get_model()
+        llm, prompt_type = LLMFactory(config=self.config).get_model()
 
-        chat_system_prompt = self.config["prompts"].get(
-            "chat_system_prompt", DEFAULT_CHAT_SYSTEM_PROMPT
+        chat_system_prompt: str = self.config["prompts"].get("chat_system_prompt", None)
+        chat_human_prompt: str = self.config["prompts"].get(
+            "chat_human_prompt", DEFAULT_CHAT_PROMPT
         )
 
-        template = (
-            chat_system_prompt
-            + """
-            Context:
-            {context}
-
-            Question: {question}"""
+        retrieval_qa_prompt = PromptFactory.build_prompt_template(
+            system_prompt=chat_system_prompt,
+            human_prompt=chat_human_prompt,
+            prompt_type=prompt_type,
+            input_variables=["context", "question"],
         )
 
-        prompt = PromptTemplate(
-            template=template, input_variables=["context", "question"]
-        )
         qa = RetrievalQA.from_chain_type(
             llm=llm,
             chain_type="stuff",
@@ -266,7 +269,7 @@ class ChainFactory:
             return_source_documents=True,
             chain_type_kwargs={
                 "verbose": False,
-                "prompt": prompt,
+                "prompt": retrieval_qa_prompt,
                 # "memory": ConversationBufferMemory(
                 #     memory_key="history",
                 #     input_key="question"),

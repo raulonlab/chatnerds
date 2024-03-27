@@ -1,10 +1,12 @@
 # [ChatNerds](https://github.com/raulonlab/chatnerds)
 
-Yet another CLI tool to Q&A with your documents, also including YouTube videos and podcasts, using local LLMs and RAG (Retrieval-augmented generation) techniques. This is my personal project to learn about LLM and RAG
+Yet another CLI tool to Q&A with your documents, also including YouTube videos and podcasts, using local LLMs and RAG (Retrieval-augmented generation) techniques. This is my personal project to learn about LLMs and RAGs.
 
 ## Introduction
 
-Chatnerds allows you to create and manage "nerds", each one with its own configuration and set of documents. The idea of a nerd is to be an expert in a specific subject. You can create as many nerd as you want, but can only work with one at a time.
+Welcome to Chatnerds, a command-line interface (CLI) application to interact with private documents, YouTube videos, and podcasts using local language models (LLMs) and retrieval-augmented generation (RAG) techniques. The application allows you to create and interact with "nerds", each designed as an expert in a particular area of knowledge, with its own configuration and set of documents.
+
+You can create multiple nerds to cover a wide range of topics and activate one at a time to talk about that specific area. 
 
 ## How to install?
 
@@ -29,36 +31,36 @@ chatnerds --help
 ```
 
 ```
-Usage: chatnerds [OPTIONS] COMMAND [ARGS]...
+ Usage: chatnerds [OPTIONS] COMMAND [ARGS]...
 
-╭─ Options ───────────────────────────────────────────────────────────────────────╮
-│ --install-completion          Install completion for the current shell.         │
-│ --show-completion             Show completion for the current shell, to copy it │
-│                               or customize the installation.                    │
-│ --help                        Show this message and exit.                       │
-╰─────────────────────────────────────────────────────────────────────────────────╯
-╭─ Commands ──────────────────────────────────────────────────────────────────────╮
-│ init                  Initialize a new nerd. A nerd is a collection of sources  │
-│                       and documents                                             │
-│ remove                Remove an existing nerd                                   │
-│ rename                Rename an existing nerd                                   │
-│ activate              Activate a nerd. All subsequent commands like study,      │
-│                       chat, etc. will use the active nerd configuration and     │
-│                       source documents.                                         │
-│ list                  List all available nerds                                  │
-│ download-sources      Download audio files (.mp3) of youtube and podcast        │
-│                       sources                                                   │
-│ transcribe-downloads  Transcribe downloaded audio files into transcript files   │
-│                       (.transcript)                                             │
-│ study                 Start studying (ingesting) the source documents and save  │
-│                       the embeddings in the local DB                            │
-│ chat                  Start an interactive chat session with your active nerd   │
-│ review                Append a review value to the last chat log                │
-│ env                   Print the current value of environment variables          │
-│ config                Print the active nerd configuration (config.yml)          │
-│ tools                 Other tools                                               │
-│ db                    Other commands related with the local DB                  │
-╰─────────────────────────────────────────────────────────────────────────────────╯
+╭─ Options ─────────────────────────────────────────────────────────────────────────╮
+│ --install-completion          Install completion for the current shell.           │
+│ --show-completion             Show completion for the current shell, to copy it   │
+│                               or customize the installation.                      │
+│ --help                        Show this message and exit.                         │
+╰───────────────────────────────────────────────────────────────────────────────────╯
+╭─ Commands ────────────────────────────────────────────────────────────────────────╮
+│ init                  Create and initialize a new nerd with the given name        │
+│ remove                Remove an existing nerd                                     │
+│ rename                Rename an existing nerd                                     │
+│ activate              Activate a nerd. All subsequent commands like chat, study,  │
+│                       etc. will use the active nerd configuration and source      │
+│                       documents.                                                  │
+│ list                  List all available nerds                                    │
+│ download-sources      Download audio files (.mp3) of youtube and podcast sources  │
+│ transcribe-downloads  Transcribe downloaded audio files into transcript files     │
+│                       (.transcript) and copy them to 'source_documents' directory │
+│ study                 Start studying documents in 'source_documents' directory    │
+│                       (embed and store documents in vector DB)                    │
+│ chat                  Start a chat session with your active nerd                  │
+│ retrieve              Retrieve relevant documents of a query and optionally       │
+│                       generate a summary of the documents.                        │
+│ review                Append a review value to the last chat log                  │
+│ env                   Print the current value of environment variables            │
+│ config                Print the active nerd configuration (config.yml)            │
+│ tools                 Miscellaneous tools                                         │
+│ db                    View and manage the local DBs                               │
+╰───────────────────────────────────────────────────────────────────────────────────╯
 
 ```
 
@@ -75,9 +77,12 @@ The following files will be created in the nerds folder:
 ```
 📁 nerds/
 ├─ 📁 nerd_name/
+│  ├─ 📁 .nerd_store/        // <-- stores data files (status and vector DBs)
 │  ├─ 📁 downloads/          // <-- audios downloaded from youtube and podcasts
 │  ├─ 📁 source_documents/   // <-- source documents to ingest (pdf, txt, etc)
-│  ├─ 📄 config.yml          // <-- LLM and RAG configuration of the nerd
+│  ├─ 📄 config.models.yml   // <-- Additional LLM presets
+│  ├─ 📄 config.prompts.yml  // <-- Customized prompts
+│  ├─ 📄 config.yml          // <-- Customized configuration
 │  ├─ 📄 podcast.sources     // <-- source podcast URLs (XML feed)
 │  ├─ 📄 youtube.sources     // <-- source youtube URLs (channel, playlist or video)
 ```
@@ -116,7 +121,7 @@ For the Youtube and podcast sources it's necessary to download the audio and tra
 
 ### Download and transcribe Youtube and podcast sources
 
-![Study diagram](docs/download-transcribe.png)
+![Download and transcribre diagram](docs/download-transcribe.png)
 
 Start downloading the audio files (.mp3) of the youtube and podcast sources:
 ```bash
@@ -134,99 +139,133 @@ chatnerds transcribe-downloads
 
 ![Study diagram](docs/study.png)
 
-Start studying (also known as ingesting) the documents located in `source_documents/` and save the data in the vector DB:
+Start ingesting the documents located in `source_documents/` (split, calculate embeddings and store in DBs):
 
 ```bash
 chatnerds study
 ```
-> Processed documents are stored in a Chroma vector database whose data files are placed in a subdirectory `db` of the nerd directory. The first time using a new sentence transformer model, it will download the model files and might take a while
+> The command processes documents by storing them in a vector database (either Chroma or Qdrant), with the database files located in the `.nerd_store/` subdirectory within the nerd's directory. Additionally, the necessary files for the sentence transformer model are automatically downloaded upon the first execution, which may require some time to complete.
 
 For each document, the study process does the following steps:
-- Load the document using a Langchain loader
-- Split the document in big chunks and small chunks. Small chunks are used for retrieval / similarity searches. Big chunks (or parent chunks) are the ones included as a context in the prompt sent to the LLM
-- Calculate the embeddings of the chunks using the sentence transformer model
-- Store the document, big chunks, small chunks and embeddings in the local DB
+- Load the document via a Langchain loader.
+- Split the document into smaller chunks.
+- Apply the sentence transformer model to generate embeddings of these chunks, which are used in the retrieval / similarity searches.
+- Store both the chunks and their corresponding embeddings into the vector database.
+- Store the original document within a local database called Status DB.
 
-Documents already processed and stored in the database are skipped
+In subsequent runs, documents already processed are automatically excluded.
 
-For the embedding calculations, it uses the Langchain classes HuggingFaceInstructEmbeddings or HuggingFaceEmbeddings. The model can be set up in the config.yml file of the nerd. The default model is `hkunlp/instructor-large`
+The embeddings model is loaded using Langchain's `HuggingFaceInstructEmbeddings` or `HuggingFaceEmbeddings` classes. The default model is `hkunlp/instructor-large` and can be changed in the `config.yml` file for the nerd. 
 
 ### Chat
 
 ![Chat chain diagram](docs/chat-chain.png)
 
-Start chatting with your active nerd in interactive mode:
+Start an interactive chat session with your active nerd using the command line:
 ```bash
 chatnerds chat
 ```
 
-or send the question straight away:
+Alternatively, you can send a one-off question passing it as an argument:
 ```bash
 chatnerds chat "..."
 ```
+> Note: The first time you use a new LLM model, the necessary model files will be downloaded, which may take some time.
 
-> The first time using a new LLM model, it will download the model files and might take a while
+The LLM model for completions is configurable in the nerd's `config.yml` file (Further details are covered in subsequent sections). The default model is mistral-7b-instruct-v0.1-gguf:
 
-The LLM used for completion can be set in the `config.yml` of the nerd. See more details about the nerd config in next sections. The default model is `mistral-7b-instruct-v0.1-gguf`:
-```
+```yaml
 mistral-7b-instruct-v0.1-gguf:
   provider: llamacpp
   prompt_type: mistral
   model_id: TheBloke/Mistral-7B-Instruct-v0.1-GGUF
   model_basename: mistral-7b-instruct-v0.1.Q4_K_M.gguf
   temperature: 0.2
+  # top_p: 0.95
+  n_ctx: 16000
   max_tokens: 8192
-  n_batch: 1024  # 512 (Default: 8) set this based on your GPU & CPU RAM
+  n_batch: 512  # Adjust based on your GPU & CPU RAM capacity (Default: 8)
   n_gpu_layers: -1
 ```
 
-The model provider (aka model loader) can be set with the property `provider`. These are the available providers:
-- `provider: llamacpp`: (Default if not present) HuggingFace model with `LlamaCpp`
-- `provider: ollama`: Ollama server
-- `provider: openai`: OpenAI server (base_url is configurable in order to use other APIs with the same interface than OpenAI)
+The `provider` property indicates the component that provides the model. Available providers include:
+- `llamacpp`: (Default if not present) HuggingFace model using Langchain's `LlamaCpp` class (package `llama-cpp-python`)
+- `ollama`: Ollama server using Langchain's `ChatOllama` or `Ollama` classes.
+- `openai`: OpenAI server using Langchain's `ChatOpenAI` or `OpenAI` classes. The `base_url` can be set to point to APIs providing the same interface than OpenAI
 
-> All the properties defined in the model will be sent to the provider class (temperature, max_tokens, etc)
+> All defined properties (e.g., temperature, max_tokens) will be forwarded to the selected provider class.
 
-The prompt can also be formated depending on the model architectures with the property `prompt_type`. These are the available prompt types:
-- `prompt_type: llama`: Specific Llama prompt syntax. Use it with provider `llamacpp` and a llama/llama2 type model
-- `prompt_type: mistral`: Specific Mistral prompt syntax. Use it with provider `llamacpp` and a mistral type model
-- `prompt_type: None` (or not set): No formatting is applied to the prompt. Use it with provider `ollama` and `openai`
+The `prompt_type` property sets the formatting of the prompts according to the model's architecture, with available options being:
+
+- `llama`: Specific Llama prompt syntax. Use it with provider `llamacpp` and a llama/llama2 type model
+- `mistral`: Specific Mistral prompt syntax. Use it with provider `llamacpp` and a mistral type model
+- `None` (or unset): No prompt formatting. Suitable for `ollama` and `openai` providers.
+
+Finally, you can adjust the behaviour of the chain in the section `chat_chain` of the config file. Some of the parameters are:
+- `n_expanded_questions`: Number of similar questions to expand the original query with. Set 0 to disable query expansion. (Default: 3)
+- `use_cross_encoding_rerank`: Enable / disable cross-encoding reranking of retrieved documents. (Default: true)
+- `n_combined_documents`: Number of documents to retrieve and to combine as a context in the chat prompt sent to the LLM. (Default: 6)
+
+### Retrieve and summarize
+
+![Retrieve chain diagram](docs/retrieve-chain.png)
+
+If you only want to retrieve the most relevant documents related with a given query, run the command::
+```bash
+chatnerds retrieve
+```
+
+And optionally generate and display a summary of the retrieved documents:
+```bash
+chatnerds retrieve --summary
+```
+
+You can adjust the behaviour of the chain and the summary in the sections `retrieve_chain` and `summarize` of the config file. 
 
 ### Nerd configuration
 
-Print the active nerd configuration:
+Display the nerd's current configuration with the command:
 ```bash
 chatnerds config
 ```
 
-The file `config.yml` in the nerd directory allows to override the default model settings used by the nerd. See the default configuration (with annotations) in [chatnerds/config.yml](chatnerds/config.yml). The new configuration is applied on every command. 
+You can customize the behaviour of the nerd by editing the `config.yml` file in the nerd directory. The default settings used by the nerd are defined in [chatnerds/config.yml](chatnerds/config.yml). Changes to the configuration take effect immediately with each command execution.
 
-> Note that changing some of the configuration, like `embeddings` and `chroma`, will invalidate the current embeddings added in the database. To fix it, delete the directory `./nerds/nerd_name/db` and start again
+> Important: Changes to certain settings, such as `embeddings` and `vector_store`, will invalidate the existing embeddings in the vector store. To address this, remove the `.nerd_store` directory and run `chatnerds study` again.
+
+There exists 2 additional config files that can be customized:
+- `config.models.yml`: Add custom model presets available to your nerd. See initial presets in [chatnerds/config.models.yml](https://github.com/raulonlab/chatnerds/blob/main/chatnerds/config.models.yml) or run `chatnerds config models` to see the complete list.
+- `config.prompts.yml`: Change the prompts used by the nerd. See default prompts in [chatnerds/config.prompts.yml](https://github.com/raulonlab/chatnerds/blob/main/chatnerds/config.prompts.yml) or run `chatnerds config prompts` to see the active ones.
 
 ## Configuration with environment variables
 
-The general behaviour of the application can be configured with environment variables or reading them from a `.env` file in the current path (optional). 
+You can adjust the application's general behavior using environment variables, either directly or by specifying them in an optional `.env` file located in the current directory.
 
-Print the current value of environment variables:
+To view the current set of environment variables, use the command:
 ```bash
 chatnerds env
 ```
 
-Or print the default value of environment variables defined initially by the application (it will be the same than the current values if no .env file present)
+To display the default values as initially defined by the application (which will match the current values if no .env file is present), execute:
 ```bash
 chatnerds env --default
 ```
 
 The available variables with their default values are:
 
-```bash
-LOG_FILE_LEVEL=NOTSET  # (Default: NOTSET) Logging level for the log file. Values: INFO, WARNING, ERROR, CRITICAL, NOTSET. If None, disable logging to file
+```ini
+# general options
+NERDS_DIRECTORY_PATH=nerds  # (Default: "nerds") Path to nerds directory
+LOG_FILE_LEVEL=  # (Default: None) Logging level for the log file. Values: INFO, WARNING, ERROR, CRITICAL, NOTSET. If None, disable logging to file
 LOG_FILE_PATH=logs/chatnerds.log  # (Default: "logs/chatnerds.log") Path to log file
 VERBOSE=1  # (Default: 1) Amount of logs written to stdout (0: none, 1: medium, 2: full)
 
 # transcription (Whisper) options
 WHISPER_TRANSCRIPTION_MODEL_NAME=base  # (Default: "base") Name of the model to use for transcribing audios: tiny, base, small, medium, large
 TRANSCRIPT_ADD_SUMMARY=False  # (Default: False) Include a summary of the transcription in the output file
+
+# openai
+OPENAI_API_KEY=  # (Default: None) OpenAI API key. If None, disable OpenAI integration
 
 # youtube download options
 YOUTUBE_GROUP_BY_AUTHOR=True  # (Default: True) Group downloaded videos by channel
@@ -244,8 +283,9 @@ PODCAST_MAXIMUM_EPISODE_COUNT=30  # (Default: 30) Only download the given number
 PODCAST_SHOW_PROGRESS_BAR=True  # (Default: True) Show a progress bar while downloading
 ```
 
-The application also saves certain runtime settings in the file `.chatnerds.env` (for example, the active nerd). It's not necessary to touch this file since is handled automatically by the application.
+The application also stores runtime settings in the `.chatnerds.env` file, such as the active nerd configuration. It's not necessary to touch this file, as it is handled automatically by the application.
 
 ## License
 
-MIT
+This project is under the MIT License. For more details, see the LICENSE file.
+
